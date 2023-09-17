@@ -35,8 +35,11 @@ public:
 public:
     Vec3 operator+(const Vec3 &other) const;
     Vec3 operator-(const Vec3 &other) const;
+    Vec3 operator*(double value) const;
 
     Vec3 &operator*=(double value);
+    Vec3 &operator/=(double value);
+    Vec3 &operator+=(const Vec3 &other);
 
 public:
     double &operator[](size_t i);

@@ -42,6 +42,7 @@ else()
             mat4.h mat4.cpp
             vec3.h vec3.cpp
             objLoader.h
+            camera.h camera.cpp
         )
     endif()
 endif()

@@ -1,11 +1,13 @@
 #ifndef PLOTTER_H
 #define PLOTTER_H
 
+#include "camera.h"
 #include "mat4.h"
 
 #include <QFile>
 #include <QImage>
 #include <QObject>
+#include <QVector>
 
 
 class Plotter : public QObject
@@ -26,8 +28,11 @@ public:
     bool loadFromObj(QFile objFile);
     void setData(QVector<Math::Vec3> data, QVector<QPair<size_t, size_t>> indexes);
     void rotate(double dx, double dy, double dz = 0.0);
-    void move(double dx, double dy);
+    void move(double dx, double dy, double dz);
     void zoom(double factor);
+
+public:
+    SharedCamera getCamera() const {return camera;};
 
 protected:
     bool clipCohenSuther(double &x1, double &y1, double &x2, double &y2,
@@ -43,8 +48,12 @@ Q_SIGNALS:
 protected:
     QSize sz;
     QImage backbuffer;
+    QVector<double> zbuffer;
     QColor clearClr;
     QColor wireframeClr;
+
+protected:
+    SharedCamera camera;
 
 protected:
     QVector<Math::Vec3> data;

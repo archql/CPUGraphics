@@ -64,9 +64,27 @@ Vec3 Vec3::operator-(const Vec3 &other) const
     return res;
 }
 
+Vec3 Vec3::operator*(double value) const
+{
+    Vec3 v = *this;
+    return v*=value;
+}
+
 Vec3 &Vec3::operator*=(double value)
 {
     std::for_each(mData.begin(), mData.end(), [value](double &v){v *= value;});
+    return *this;
+}
+
+Vec3 &Vec3::operator/=(double value)
+{
+    std::for_each(mData.begin(), mData.end(), [value](double &v){v /= value;});
+    return *this;
+}
+
+Vec3 &Vec3::operator+=(const Vec3 &other)
+{
+    std::transform(other.mData.begin(), other.mData.end(), mData.begin(), mData.begin(), std::plus<>{});
     return *this;
 }
 

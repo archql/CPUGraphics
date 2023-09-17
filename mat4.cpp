@@ -105,17 +105,27 @@ void Mat4::rotateZ(double z)
     mData[3*N + 3] = 1;
 }
 
+void Mat4::orto(double w, double h, double zNear, double zFar)
+{
+    const double temp2 = zNear - zFar;
+    mData[0*N + 0] = 2 / w;
+    mData[1*N + 1] = 2 / h;
+    mData[2*N + 2] = zFar / temp2;
+    mData[2*N + 3] = zNear * zFar / temp2;
+    mData[3*N + 3] = 1;
+}
+
 void Mat4::perspective(double aspect, double fov, double zNear, double zFar)
 {
     //
     const double temp2 = zNear - zFar;
     const double temp = 1.0 / tan(fov * (std::numbers::pi / 360.0));
-    // initialize as identity matrix
-    mData[0*N + 0] = temp * aspect;
+    //
+    mData[0*N + 0] = temp / aspect;
     mData[1*N + 1] = temp;
     mData[2*N + 2] = zFar / temp2;
     mData[2*N + 3] = zNear * zFar / temp2;
-    mData[3*N + 2] = -1;
+    mData[3*N + 2] = -1; //
 }
 
 void Mat4::viewport(double x, double y, double w, double h)
@@ -232,6 +242,8 @@ Vec3 Math::Mat4::operator*(const Vec3 &other) const
     vec[0] = mData[0*N+0]*other[0] + mData[0*N+1]*other[1] + mData[0*N+2]*other[2] + mData[0*N+3];
     vec[1] = mData[1*N+0]*other[0] + mData[1*N+1]*other[1] + mData[1*N+2]*other[2] + mData[1*N+3];
     vec[2] = mData[2*N+0]*other[0] + mData[2*N+1]*other[1] + mData[2*N+2]*other[2] + mData[2*N+3];
+    const double w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
+    vec /= w;
     return vec;
 }
 

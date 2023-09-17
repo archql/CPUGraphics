@@ -53,6 +53,7 @@ public:
     void rotateY(double y);
     void rotateZ(double z);
 
+    void orto(double w, double h, double zNear, double zFar);
     void perspective(double aspect, double fov, double zNear, double zFar);
     void viewport(double x, double y, double w, double h);
     void view(const Vec3 &eye, const Vec3 &target, const Vec3 &up);
