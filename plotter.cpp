@@ -21,19 +21,30 @@ Plotter::Plotter(QSize sz, QObject *parent)
     zoom(0.3);
     matRotate.loadIdentity();
     //matTranslate.translate(2, 0, 0);
-    move(2, 0, 2);
+    move(-2, 0, -2);
     matViewport.viewport(0, 0, sz.width(), sz.height());
-    matProjection.perspective(1.2, 120, 0.1, 100.);
+    matProjection.perspective((double)sz.width() / (double)sz.height(), 120, 0.1, 100.);
     //matView.view(camera);
 }
 
-void Plotter::setData(QVector<Math::Vec3> data, QVector<QPair<size_t, size_t> > indexes)
+void Plotter::setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes)
 {
     this->data.clear();
     this->data = data;
 
     this->indexes.clear();
     this->indexes = indexes;
+
+    this->normals.clear();
+    for (const auto &ids : qAsConst(indexes)) {
+        // get plane normal
+        const auto &a = data[ids[0]];
+        const auto &b = data[ids[1]];
+        const auto &c = data[ids[2]];
+        const auto normal = Math::Vec3::cross(a - b, a - c).normalized(); // it is normal
+        this->normals.append(normal);
+        this->normalOrigins.append((a + b + c) / 3.);
+    }
 
     plot();
 }
@@ -74,45 +85,12 @@ void Plotter::zoom(double factor)
     plot();
 }
 
-
-void Plotter::plot()
+void Plotter::drawLines(QVector<Math::Vec3> trData)
 {
-    //
-    qDebug() << "plot!";
-    //
-    QElapsedTimer t;
-    t.start();
-    // clear backbuffer with clear color and zbuffer
-    backbuffer.fill(clearClr);
-    zbuffer.fill(std::numeric_limits<double>::max());
-    // get transform matrix
-    // matView = camera->view();
-    //qInfo() << camera->view() * matTranslate * matRotate * matScale;
-    //qInfo() << matProjection;
-    //qInfo() << matProjection * camera->view() * matTranslate * matRotate * matScale;
-    const Math::Mat4 mat = matViewport * matProjection * camera->view() * matTranslate * matRotate * matScale;
-    // convert points
-    QVector<Math::Vec3> trData(data);
-    // TEMP
-    double minZ = 100000, maxZ = -100000;
-    for (auto &p : trData) {
-        p = mat * p; // todo remove assignment
-        //if (abs(p[2]) < 1){
-        //p *= 1 / p[3]; // WHY???
-        //p[2] = z; // preserve z
-        minZ = std::min(minZ, p[2]);
-        maxZ = std::max(maxZ, p[2]);
-        //}
-    }
-    qInfo() << "minZ" << minZ << "maxZ" << maxZ;
-    // draw wireframe
     for (const auto &ids : qAsConst(indexes)) {
-        const auto &a = trData[ids.first];
-        const auto &b = trData[ids.second];
+        const auto &a = trData[ids[0]];
+        const auto &b = trData[ids[1]];
 
-        if ((abs(a[2]) > 1 && abs(b[2]) > 1)) {
-            continue;
-        }
         // DDA-line
         double x = a[0];
         double y = a[1];
@@ -132,23 +110,157 @@ void Plotter::plot()
         //
         const double w = x2 - x;
         const double h = y2 - y;
+        const double d = z2 - z;
         const double l = fmax(abs(w), abs(h));
         const double dx = w / l;
         const double dy = h / l;
+        const double dz = d / l;
         //
         for (size_t i = l + 1; i > 0; i--) {
             // Draw pixel algorithm
             const int intX = round(x), intY = round(y);
             const int zindex = intX + intY * sz.width();
             // get z
-            //if (zbuffer.at(zindex) < p[2] && p[2] > 0) {
-                //zbuffer[zindex] = z;
+            if (z < zbuffer.at(zindex) && abs(z) < 1) {
+                zbuffer[zindex] = z;
                 backbuffer.setPixelColor(intX, intY, wireframeClr);
-            //}
-            x+= dx;
-            y+= dy;
+            }
+            x += dx;
+            y += dy;
+            z += dz;
         }
     }
+}
+
+void Plotter::drawTriangles(QVector<Math::Vec3> trData, QVector<Math::Vec3> trNormals, QVector<Math::Vec3> trNormalOrigins)
+{
+    auto itIds = indexes.cbegin();
+    auto itNormals = trNormals.cbegin();
+    auto itNormalOrigins = trNormalOrigins.cbegin();
+    for (; itIds != indexes.cend(); itIds++, itNormals++, itNormalOrigins++) {
+        const auto ids = (*itIds);
+        const auto &a = trData[ids[0]];
+        const auto &b = trData[ids[1]];
+        const auto &c = trData[ids[2]];
+
+        // барицентрические координаты - !!! scratchapixel
+
+        // get plane normal
+        const auto normal = *itNormals; // it is normal
+        const auto normalOrigin = *itNormalOrigins;
+        const auto nrml = Math::Vec3::cross(a-b, a-c);
+        const double dot = Math::Vec3::dot(normal, (normalOrigin - camera->pos()).normalized());
+        //const double dot = Math::Vec3::dot(nrml, (a - Math::Vec3(sz.width() / 2, sz.height() / 2, -80)).normalized());
+        //const double light = Math::Vec3::dot(normal, Math::Vec3(0, 0, 1)); // TODO top down light
+        //qInfo() << light;
+        const QColor color = QColor::fromHsvF(0.1, 1, std::clamp(abs(dot), 0., 1.));
+        if (dot <= 0) {
+            continue;
+        }
+
+        if ((abs(a[2]) > 1 || (a[0] < 0) || (a[0] > sz.width() - 1) || (a[1] < 0) || (a[1] > sz.height() - 1)) &&
+            (abs(b[2]) > 1 || (b[0] < 0) || (b[0] > sz.width() - 1) || (b[1] < 0) || (b[1] > sz.height() - 1)) &&
+            (abs(c[2]) > 1 || (c[0] < 0) || (c[0] > sz.width() - 1) || (c[1] < 0) || (c[1] > sz.height() - 1))) {
+            continue;
+        }
+//        if ((abs(a[2]) > 1) &&
+//            (abs(b[2]) > 1) &&
+//            (abs(c[2]) > 1)) {
+//            continue;
+//        }
+        // get plane canonical
+        // const auto nrml = Math::Vec3::cross(a-b, a-c).normalized();
+        const double d = -Math::Vec3::dot(nrml, (a + b + c) / 3); // TODO danger???
+        // get x and y max min
+        int xmin = round(a[0]), xmax = round(b[0]), ymin = round(a[1]), ymax = round(b[1]), x = round(c[0]), y = round(c[1]);
+        {
+            if (xmax < xmin) {
+                std::swap(xmax, xmin);
+            }
+            if (x > xmax) {
+                std::swap(xmax, x);
+            } else if (x < xmin) {
+                std::swap(xmin, x);
+            }
+            if (xmin < 0) {
+                xmin = 0;
+            }
+            xmin = std::clamp(xmin, 0, sz.width() - 1);
+            xmax = std::clamp(xmax, 0, sz.width() - 1);
+            if (ymax < ymin) {
+                std::swap(ymax, ymin);
+            }
+            if (y > ymax) {
+                std::swap(ymax, y);
+            } else if (y < ymin) {
+                std::swap(ymin, y);
+            }
+            ymin = std::clamp(ymin, 0, sz.height() - 1);
+            ymax = std::clamp(ymax, 0, sz.height() - 1);
+        }
+        //
+        double z0 = -(nrml[0]*xmin + nrml[1]*ymin + d) / nrml[2];
+        for (int i = xmin; i < xmax; i++) {
+            double z = z0;
+            for (int j = ymin; j < ymax; j++) {
+                // edge function
+                bool inside = true;
+                inside &= edgeFunction(a[0], a[1], b[0], b[1], i, j);
+                inside &= edgeFunction(b[0], b[1], c[0], c[1], i, j);
+                inside &= edgeFunction(c[0], c[1], a[0], a[1], i, j);
+
+                const int zindex = i + j * sz.width(); // TODO simplify
+                //z = -(nrml[0]*xmin + nrml[1]*ymin + d) / nrml[2];
+                if (inside && (z < zbuffer.at(zindex))) {
+                    zbuffer[zindex] = z;
+                    backbuffer.setPixelColor(i, j, color);
+                }
+                //
+                z -= nrml[0]/nrml[2];
+            }
+            z0 -= nrml[1]/nrml[2];
+        }
+    }
+}
+
+
+void Plotter::plot()
+{
+    //
+    qDebug() << "plot!";
+    //
+    QElapsedTimer t;
+    t.start();
+    // clear backbuffer with clear color and zbuffer
+    backbuffer.fill(clearClr);
+    zbuffer.fill(std::numeric_limits<double>::max());
+    // get transform matrix
+    // matView = camera->view();
+    //qInfo() << camera->view() * matTranslate * matRotate * matScale;
+    //qInfo() << matProjection;
+    //qInfo() << matProjection * camera->view() * matTranslate * matRotate * matScale;
+    const Math::Mat4 wmat = matTranslate * matRotate * matScale; // to world cords
+    const Math::Mat4 mat = matViewport * matProjection * camera->view() * wmat;
+    // convert points
+    QVector<Math::Vec3> trData(data);
+    double minz = 100000, maxz = -100000;
+    for (auto &p : trData) {
+        p = mat * p; // todo remove assignment
+        minz = std::min(p[2], minz);
+        maxz = std::max(p[2], maxz);
+    }
+    QVector<Math::Vec3> trNormals(normals);
+    for (auto &p : trNormals) {
+        p = matRotate * p; // only rotation is needed
+    }
+    QVector<Math::Vec3> trNormalOrigins(normalOrigins);
+    for (auto &p : trNormalOrigins) {
+        p = wmat * p; // only rotation is needed
+    }
+    qInfo() << "minz" << minz << "maxz" << maxz;
+    // draw wireframe
+    //drawLines(std::move(trData)/*, std::move(trNormals), std::move(trNormalOrigins)*/);
+    drawTriangles(std::move(trData), std::move(trNormals), std::move(trNormalOrigins));
     // notify about buffer change
     emit plotChanged(backbuffer, t.elapsed());
 }

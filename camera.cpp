@@ -28,6 +28,10 @@ void Camera::moveSide(double left)
 {
     eye += Math::Vec3::cross(direction, up) * left;
 }
+void Camera::moveUp(double top)
+{
+    eye += up * top;
+}
 
 void Camera::rotate(double x, double y)
 {

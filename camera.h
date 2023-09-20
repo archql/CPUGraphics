@@ -23,6 +23,7 @@ public:
 public:
     void moveSide(double left);
     void moveForward(double forward);
+    void moveUp(double top);
     void rotate(double x, double y);
     void reset(double x, double y);
 

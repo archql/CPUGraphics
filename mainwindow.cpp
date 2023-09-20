@@ -15,10 +15,10 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     // Setup plotter
-    plotter = new Plotter(QSize(1280, 640));
+    plotter = new Plotter(QSize(1440, 960));
     // temp
     QVector < Math::Vec3 > vertices;
-    QVector < QPair<size_t, size_t> > indices;
+    QVector < QVector<int> > indices;
     QVector < Math::Vec3 > normals;
     if (loadOBJ(QFile("test.obj"), vertices, indices, normals))
     {
@@ -34,11 +34,16 @@ MainWindow::MainWindow(QWidget *parent)
 //                         {{0, 1}, {1, 2}, {2, 3}, {3, 0},
 //                          {4, 5}, {5, 6}, {6, 7}, {7, 4},
 //                          {0, 4}, {1, 5}, {2, 6}, {3, 7}});
+//        plotter->setData({{-1.0, 1.0, 1.0}, {-1.0, -1.0, 1.0}, {-1.0, -1.0, -1.0}, {-1.0, 1.0, -1.0},
+//                          {1.0, 1.0, 1.0}, {1.0, -1.0, 1.0}, {1.0, -1.0, -1.0}, {1.0, 1.0, -1.0}},
+//                         {{0, 1}, {1, 2}, {2, 3}, {3, 0},
+//                          {4, 5}, {5, 6}, {6, 7}, {7, 4},
+//                          {0, 4}, {1, 5}, {2, 6}, {3, 7}});
         plotter->setData({{-1.0, 1.0, 1.0}, {-1.0, -1.0, 1.0}, {-1.0, -1.0, -1.0}, {-1.0, 1.0, -1.0},
                           {1.0, 1.0, 1.0}, {1.0, -1.0, 1.0}, {1.0, -1.0, -1.0}, {1.0, 1.0, -1.0}},
-                         {{0, 1}, {1, 2}, {2, 3}, {3, 0},
-                          {4, 5}, {5, 6}, {6, 7}, {7, 4},
-                          {0, 4}, {1, 5}, {2, 6}, {3, 7}});
+                         {{0, 1, 2}, {2, 3, 0}, {7, 4, 0}, {3, 7, 0},
+                          {7, 3, 2}, {2, 6, 7}, {4, 5, 6}, {6, 7, 4},
+                          {1, 2, 6}, {6, 5, 1}, {0, 1, 5}, {5, 4, 0}});
     }
 
 
@@ -95,6 +100,8 @@ void MainWindow::keyPressEvent(QKeyEvent *ekey)
     case Qt::Key_S: camera->moveForward(0.1); break;
     case Qt::Key_A: camera->moveSide(0.1); break;
     case Qt::Key_D: camera->moveSide(-0.1); break;
+    case Qt::Key_Space: camera->moveUp(0.1); break;
+    case Qt::Key_Shift: camera->moveUp(-0.1); break;
     case Qt::Key_N: plotter->rotate(0.0,  0.0, -1.0); break;
     case Qt::Key_M: plotter->rotate(0.0,  0.0, 1.0); break;
     }

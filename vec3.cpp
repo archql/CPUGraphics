@@ -70,6 +70,12 @@ Vec3 Vec3::operator*(double value) const
     return v*=value;
 }
 
+Vec3 Vec3::operator/(double value) const
+{
+    Vec3 v = *this;
+    return v/=value;
+}
+
 Vec3 &Vec3::operator*=(double value)
 {
     std::for_each(mData.begin(), mData.end(), [value](double &v){v *= value;});

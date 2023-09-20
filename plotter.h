@@ -26,7 +26,7 @@ public:
 public:
     // TODO move to sep file
     bool loadFromObj(QFile objFile);
-    void setData(QVector<Math::Vec3> data, QVector<QPair<size_t, size_t>> indexes);
+    void setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes);
     void rotate(double dx, double dy, double dz = 0.0);
     void move(double dx, double dy, double dz);
     void zoom(double factor);
@@ -35,8 +35,16 @@ public:
     SharedCamera getCamera() const {return camera;};
 
 protected:
+    void drawLines(QVector<Math::Vec3> trData);
+    void drawTriangles(QVector<Math::Vec3> trData, QVector<Math::Vec3> trNormals, QVector<Math::Vec3> trNormalOrigins);
+
+protected:
     bool clipCohenSuther(double &x1, double &y1, double &x2, double &y2,
                          double rx1, double ry1, double rx2, double ry2);
+    bool edgeFunction(double ax, double ay, double bx, double by, double cx, double cy) const
+    {
+        return ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax) >= 0);
+    }
 
 public Q_SLOTS:
     void plot();
@@ -57,7 +65,9 @@ protected:
 
 protected:
     QVector<Math::Vec3> data;
-    QVector<QPair<size_t, size_t>> indexes;
+    QVector<QVector<int>> indexes;
+    QVector<Math::Vec3> normals;
+    QVector<Math::Vec3> normalOrigins;
 
     Math::Mat4 matScale;
     Math::Mat4 matRotate;
