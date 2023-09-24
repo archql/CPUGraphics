@@ -23,7 +23,7 @@ Plotter::Plotter(QSize sz, QObject *parent)
     //matTranslate.translate(2, 0, 0);
     move(-2, 0, -2);
     matViewport.viewport(0, 0, sz.width(), sz.height());
-    matProjection.perspective((double)sz.width() / (double)sz.height(), 120, 0.1, 100.);
+    matProjection.perspective((float)sz.width() / (float)sz.height(), 120, 0.1, 100.);
     //matView.view(camera);
 }
 
@@ -35,25 +35,33 @@ void Plotter::setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes)
     this->indexes.clear();
     this->indexes = indexes;
 
-    this->normals.clear();
+    // precompute normals for model
+    this->polygons.clear();
     for (const auto &ids : qAsConst(indexes)) {
         // get plane normal
         const auto &a = data[ids[0]];
         const auto &b = data[ids[1]];
         const auto &c = data[ids[2]];
-        const auto normal = Math::Vec3::cross(a - b, a - c).normalized(); // it is normal
-        this->normals.append(normal);
-        this->normalOrigins.append((a + b + c) / 3.);
+        //const auto normal = Math::Vec3::cross(a - b, a - c).normalized(); // it is normal
+        //this->normals.append(normal);
+        //this->normalOrigins.append((a + b + c) / 3.);
+        this->polygons.append({ids,
+                               wireframeClr,
+                               Math::Vec3::cross(a - b, a - c).normalized(),
+                               (a + b + c) / 3.
+        });
     }
+    //
+
 
     plot();
 }
 
-void Plotter::rotate(double dx, double dy, double dz)
+void Plotter::rotate(float dx, float dy, float dz)
 {
-    static double x_rot = 0.0;
-    static double y_rot = 0.0;
-    static double z_rot = 0.0;
+    static float x_rot = 0.0;
+    static float y_rot = 0.0;
+    static float z_rot = 0.0;
     x_rot += dx;
     y_rot += dy;
     z_rot += dz;
@@ -65,11 +73,11 @@ void Plotter::rotate(double dx, double dy, double dz)
     plot();
 }
 
-void Plotter::move(double dx, double dy, double dz)
+void Plotter::move(float dx, float dy, float dz)
 {
-    static double x_mov = 0.0;
-    static double y_mov = 0.0;
-    static double z_mov = 0.0;
+    static float x_mov = 0.0;
+    static float y_mov = 0.0;
+    static float z_mov = 0.0;
     x_mov += dx;
     y_mov += dy;
     z_mov += dz;
@@ -77,9 +85,9 @@ void Plotter::move(double dx, double dy, double dz)
     plot();
 }
 
-void Plotter::zoom(double factor)
+void Plotter::zoom(float factor)
 {
-    static double f = 1.0;
+    static float f = 1.0;
     f *= factor;
     matScale.scale(f, f, f);
     plot();
@@ -92,12 +100,12 @@ void Plotter::drawLines(QVector<Math::Vec3> trData)
         const auto &b = trData[ids[1]];
 
         // DDA-line
-        double x = a[0];
-        double y = a[1];
-        double z = a[2];
-        double x2 = b[0];
-        double y2 = b[1];
-        double z2 = b[2];
+        float x = a[0];
+        float y = a[1];
+        float z = a[2];
+        float x2 = b[0];
+        float y2 = b[1];
+        float z2 = b[2];
 
         if ((abs(z) > 1 || (x < 0) || (x > sz.width() - 1) || (y < 0) || (y > sz.height() - 1)) &&
             (abs(z2) > 1 || (x2 < 0) || (x2 > sz.width() - 1) || (y2 < 0) || (y2 > sz.height() - 1))) {
@@ -108,13 +116,13 @@ void Plotter::drawLines(QVector<Math::Vec3> trData)
             continue;
         }
         //
-        const double w = x2 - x;
-        const double h = y2 - y;
-        const double d = z2 - z;
-        const double l = fmax(abs(w), abs(h));
-        const double dx = w / l;
-        const double dy = h / l;
-        const double dz = d / l;
+        const float w = x2 - x;
+        const float h = y2 - y;
+        const float d = z2 - z;
+        const float l = fmax(abs(w), abs(h));
+        const float dx = w / l;
+        const float dy = h / l;
+        const float dz = d / l;
         //
         for (size_t i = l + 1; i > 0; i--) {
             // Draw pixel algorithm
@@ -132,45 +140,27 @@ void Plotter::drawLines(QVector<Math::Vec3> trData)
     }
 }
 
-void Plotter::drawTriangles(QVector<Math::Vec3> trData, QVector<Math::Vec3> trNormals, QVector<Math::Vec3> trNormalOrigins)
+void Plotter::drawTriangles(QVector<Math::Vec3> trData)
 {
-    auto itIds = indexes.cbegin();
-    auto itNormals = trNormals.cbegin();
-    auto itNormalOrigins = trNormalOrigins.cbegin();
-    for (; itIds != indexes.cend(); itIds++, itNormals++, itNormalOrigins++) {
-        const auto ids = (*itIds);
-        const auto &a = trData[ids[0]];
-        const auto &b = trData[ids[1]];
-        const auto &c = trData[ids[2]];
 
-        // барицентрические координаты - !!! scratchapixel
+    for (const auto &p : qAsConst(polygonsFiltered)) {
+        const auto &a = trData[p.indexes[0]];
+        const auto &b = trData[p.indexes[1]];
+        const auto &c = trData[p.indexes[2]];
 
-        // get plane normal
-        const auto normal = *itNormals; // it is normal
-        const auto normalOrigin = *itNormalOrigins;
-        const auto nrml = Math::Vec3::cross(a-b, a-c);
-        const double dot = Math::Vec3::dot(normal, (normalOrigin - camera->pos()).normalized());
-        //const double dot = Math::Vec3::dot(nrml, (a - Math::Vec3(sz.width() / 2, sz.height() / 2, -80)).normalized());
-        //const double light = Math::Vec3::dot(normal, Math::Vec3(0, 0, 1)); // TODO top down light
-        //qInfo() << light;
-        const QColor color = QColor::fromHsvF(0.1, 1, std::clamp(abs(dot), 0., 1.));
-        if (dot <= 0) {
-            continue;
-        }
 
         if ((abs(a[2]) > 1 || (a[0] < 0) || (a[0] > sz.width() - 1) || (a[1] < 0) || (a[1] > sz.height() - 1)) &&
             (abs(b[2]) > 1 || (b[0] < 0) || (b[0] > sz.width() - 1) || (b[1] < 0) || (b[1] > sz.height() - 1)) &&
             (abs(c[2]) > 1 || (c[0] < 0) || (c[0] > sz.width() - 1) || (c[1] < 0) || (c[1] > sz.height() - 1))) {
             continue;
         }
-//        if ((abs(a[2]) > 1) &&
-//            (abs(b[2]) > 1) &&
-//            (abs(c[2]) > 1)) {
-//            continue;
-//        }
+ //        if ((abs(a[2]) > 1) &&
+ //            (abs(b[2]) > 1) &&
+ //            (abs(c[2]) > 1)) {
+ //            continue;
+ //        }
         // get plane canonical
         // const auto nrml = Math::Vec3::cross(a-b, a-c).normalized();
-        const double d = -Math::Vec3::dot(nrml, (a + b + c) / 3); // TODO danger???
         // get x and y max min
         int xmin = round(a[0]), xmax = round(b[0]), ymin = round(a[1]), ymax = round(b[1]), x = round(c[0]), y = round(c[1]);
         {
@@ -199,26 +189,20 @@ void Plotter::drawTriangles(QVector<Math::Vec3> trData, QVector<Math::Vec3> trNo
             ymax = std::clamp(ymax, 0, sz.height() - 1);
         }
         //
-        double z0 = -(nrml[0]*xmin + nrml[1]*ymin + d) / nrml[2];
         for (int i = xmin; i < xmax; i++) {
-            double z = z0;
             for (int j = ymin; j < ymax; j++) {
-                // edge function
-                bool inside = true;
-                inside &= edgeFunction(a[0], a[1], b[0], b[1], i, j);
-                inside &= edgeFunction(b[0], b[1], c[0], c[1], i, j);
-                inside &= edgeFunction(c[0], c[1], a[0], a[1], i, j);
-
-                const int zindex = i + j * sz.width(); // TODO simplify
-                //z = -(nrml[0]*xmin + nrml[1]*ymin + d) / nrml[2];
-                if (inside && (z < zbuffer.at(zindex))) {
-                    zbuffer[zindex] = z;
-                    backbuffer.setPixelColor(i, j, color);
+                float u, v, t;
+                if (rayTriangleIntersect(Math::Vec3(i, j, -2).normalized(),
+                                         Math::Vec3(i, j, 2).normalized(),
+                                         a, b, c, t, u, v)) {
+                    const float z = u * a[2] + v * b[2] + (1 - u - v) * c[2];
+                    const int zindex = i + j * sz.width(); // TODO simplify
+                    if (z < zbuffer.at(zindex)) {
+                        zbuffer[zindex] = z;
+                        backbuffer.setPixelColor(i, j, p.color);
+                    }
                 }
-                //
-                z -= nrml[0]/nrml[2];
             }
-            z0 -= nrml[1]/nrml[2];
         }
     }
 }
@@ -233,7 +217,7 @@ void Plotter::plot()
     t.start();
     // clear backbuffer with clear color and zbuffer
     backbuffer.fill(clearClr);
-    zbuffer.fill(std::numeric_limits<double>::max());
+    zbuffer.fill(std::numeric_limits<float>::max());
     // get transform matrix
     // matView = camera->view();
     //qInfo() << camera->view() * matTranslate * matRotate * matScale;
@@ -243,31 +227,38 @@ void Plotter::plot()
     const Math::Mat4 mat = matViewport * matProjection * camera->view() * wmat;
     // convert points
     QVector<Math::Vec3> trData(data);
-    double minz = 100000, maxz = -100000;
+    float minz = 100000, maxz = -100000;
     for (auto &p : trData) {
         p = mat * p; // todo remove assignment
         minz = std::min(p[2], minz);
         maxz = std::max(p[2], maxz);
     }
-    QVector<Math::Vec3> trNormals(normals);
-    for (auto &p : trNormals) {
-        p = matRotate * p; // only rotation is needed
-    }
-    QVector<Math::Vec3> trNormalOrigins(normalOrigins);
-    for (auto &p : trNormalOrigins) {
-        p = wmat * p; // only rotation is needed
+    // calculate colors and camera-dots
+    const Math::Vec3 campos = camera->pos();
+    polygonsFiltered.clear();
+    // const Math::Vec3 light {}; // TODO
+    for (const auto &p : qAsConst(polygons)) {
+        Math::Vec3 nrml = matRotate * p.normal; // preserve normalization
+        Math::Vec3 orgn = wmat * p.origin;
+
+        const float dot = Math::Vec3::dot(nrml, (orgn - campos).normalized());
+        if (dot >= 0) {
+            Polygon copyP = p;
+            copyP.color = QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(abs(dot), 0.f, 1.f));
+            polygonsFiltered.push_back(copyP);
+        }
     }
     qInfo() << "minz" << minz << "maxz" << maxz;
     // draw wireframe
     //drawLines(std::move(trData)/*, std::move(trNormals), std::move(trNormalOrigins)*/);
-    drawTriangles(std::move(trData), std::move(trNormals), std::move(trNormalOrigins));
+    drawTrianglesNew(std::move(trData));
     // notify about buffer change
     emit plotChanged(backbuffer, t.elapsed());
 }
 
-bool Plotter::clipCohenSuther(double &x1, double &y1, double &x2, double &y2,
-                     double rx1, double ry1, double rx2, double ry2) {
-    static auto computeCode = [rx1, ry1, rx2, ry2](double x, double y) {
+bool Plotter::clipCohenSuther(float &x1, float &y1, float &x2, float &y2,
+                     float rx1, float ry1, float rx2, float ry2) {
+    static auto computeCode = [rx1, ry1, rx2, ry2](float x, float y) {
         unsigned int code = INSIDE;
         if (x < rx1)
             code |= LEFT;
@@ -298,7 +289,7 @@ bool Plotter::clipCohenSuther(double &x1, double &y1, double &x2, double &y2,
             // Some segment of line lies within the
             // rectangle
             int code_out;
-            double x, y;
+            float x, y;
 
             // At least one endpoint is outside the
             // rectangle, pick it.

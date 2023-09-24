@@ -25,18 +25,18 @@ bool loadOBJ(
         if (!first.compare("v", Qt::CaseInsensitive)) {
             // its a vertex
             out_vertices.append({
-                lineParts.at(1).toDouble(),
-                lineParts.at(2).toDouble(),
-                lineParts.at(3).toDouble()
+                lineParts.at(1).toFloat(),
+                lineParts.at(2).toFloat(),
+                lineParts.at(3).toFloat()
             });
         }
         else if (!first.compare("vn", Qt::CaseInsensitive))
         {
             // its a normal
             out_normals.append({
-                lineParts.at(1).toDouble(),
-                lineParts.at(2).toDouble(),
-                lineParts.at(3).toDouble()
+                lineParts.at(1).toFloat(),
+                lineParts.at(2).toFloat(),
+                lineParts.at(3).toFloat()
             });
         }
         else if (!first.compare("f", Qt::CaseInsensitive))

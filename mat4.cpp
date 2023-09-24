@@ -12,12 +12,12 @@ Mat4::Mat4()
 
 }
 
-//Mat4::Mat4(double m00, double m01, double m02, double m03, double m10, double m11, double m12, double m13, double m20, double m21, double m22, double m23, double m30, double m31, double m32, double m33)
+//Mat4::Mat4(float m00, float m01, float m02, float m03, float m10, float m11, float m12, float m13, float m20, float m21, float m22, float m23, float m30, float m31, float m32, float m33)
 //{
 //    mData[0*N+0] = m00;
 //}
 
-Mat4::Mat4(std::array<double, N*N> data)
+Mat4::Mat4(std::array<float, N*N> data)
 {
     mData.swap(data);
 }
@@ -37,7 +37,7 @@ void Mat4::loadZero()
     std::fill(mData.begin(), mData.end(), 0.0);
 }
 
-void Mat4::translate(double x, double y, double z)
+void Mat4::translate(float x, float y, float z)
 {
     loadIdentity();
     mData[0*N + 3] = x;
@@ -53,7 +53,7 @@ void Mat4::translate(const Vec3 &tr)
     mData[2*N + 3] = tr[2];
 }
 
-void Mat4::scale(double x, double y, double z)
+void Mat4::scale(float x, float y, float z)
 {
     mData[0*N + 0] = x;
     mData[1*N + 1] = y;
@@ -69,10 +69,10 @@ void Mat4::scale(const Vec3 &sc)
     mData[3*N + 3] = 1;
 }
 
-void Mat4::rotateX(double x)
+void Mat4::rotateX(float x)
 {
-    const double s = sin(x * (std::numbers::pi / 180.0));
-    const double c = cos(x * (std::numbers::pi / 180.0));
+    const float s = sin(x * (std::numbers::pi / 180.0));
+    const float c = cos(x * (std::numbers::pi / 180.0));
     mData[0*N + 0] = 1;
     mData[1*N + 1] = c;
     mData[2*N + 2] = c;
@@ -81,10 +81,10 @@ void Mat4::rotateX(double x)
     mData[3*N + 3] = 1;
 }
 
-void Mat4::rotateY(double y)
+void Mat4::rotateY(float y)
 {
-    const double s = sin(y * (std::numbers::pi / 180.0));
-    const double c = cos(y * (std::numbers::pi / 180.0));
+    const float s = sin(y * (std::numbers::pi / 180.0));
+    const float c = cos(y * (std::numbers::pi / 180.0));
     mData[0*N + 0] = c;
     mData[1*N + 1] = 1;
     mData[2*N + 2] = c;
@@ -93,10 +93,10 @@ void Mat4::rotateY(double y)
     mData[3*N + 3] = 1;
 }
 
-void Mat4::rotateZ(double z)
+void Mat4::rotateZ(float z)
 {
-    const double s = sin(z * (std::numbers::pi / 180.0));
-    const double c = cos(z * (std::numbers::pi / 180.0));
+    const float s = sin(z * (std::numbers::pi / 180.0));
+    const float c = cos(z * (std::numbers::pi / 180.0));
     mData[0*N + 0] = c;
     mData[1*N + 1] = c;
     mData[2*N + 2] = 1;
@@ -105,9 +105,9 @@ void Mat4::rotateZ(double z)
     mData[3*N + 3] = 1;
 }
 
-void Mat4::orto(double w, double h, double zNear, double zFar)
+void Mat4::orto(float w, float h, float zNear, float zFar)
 {
-    const double temp2 = zNear - zFar;
+    const float temp2 = zNear - zFar;
     mData[0*N + 0] = 2 / w;
     mData[1*N + 1] = 2 / h;
     mData[2*N + 2] = zFar / temp2;
@@ -115,11 +115,11 @@ void Mat4::orto(double w, double h, double zNear, double zFar)
     mData[3*N + 3] = 1;
 }
 
-void Mat4::perspective(double aspect, double fov, double zNear, double zFar)
+void Mat4::perspective(float aspect, float fov, float zNear, float zFar)
 {
     //
-    const double temp2 = zNear - zFar;
-    const double temp = 1.0 / tan(fov * (std::numbers::pi / 360.0));
+    const float temp2 = zNear - zFar;
+    const float temp = 1.0 / tan(fov * (std::numbers::pi / 360.0));
     //
     mData[0*N + 0] = temp / aspect;
     mData[1*N + 1] = temp;
@@ -128,7 +128,7 @@ void Mat4::perspective(double aspect, double fov, double zNear, double zFar)
     mData[3*N + 2] = -1; //
 }
 
-void Mat4::viewport(double x, double y, double w, double h)
+void Mat4::viewport(float x, float y, float w, float h)
 {
     // initialize
     loadZero();
@@ -169,15 +169,15 @@ Math::Mat4 &Math::Mat4::operator+=(const Mat4 &other)
     return *this;
 }
 
-Mat4 &Mat4::operator+=(double value)
+Mat4 &Mat4::operator+=(float value)
 {
-    std::for_each(mData.begin(), mData.end(), [value](double &v){v += value;});
+    std::for_each(mData.begin(), mData.end(), [value](float &v){v += value;});
     return *this;
 }
 
-Mat4 &Mat4::operator*=(double value)
+Mat4 &Mat4::operator*=(float value)
 {
-    std::for_each(mData.begin(), mData.end(), [value](double &v){v *= value;});
+    std::for_each(mData.begin(), mData.end(), [value](float &v){v *= value;});
     return *this;
 }
 
@@ -187,25 +187,25 @@ Mat4 Mat4::operator+(const Mat4 &other) const
     return mat += *this;
 }
 
-Mat4 Mat4::operator+(double value) const
+Mat4 Mat4::operator+(float value) const
 {
     Mat4 mat;
     return mat += value;
 }
 
-Mat4 Mat4::operator*(double value) const
+Mat4 Mat4::operator*(float value) const
 {
     Mat4 mat;
     return mat *= value;
 }
 
-double &Mat4::operator[](size_t i)
+float &Mat4::operator[](size_t i)
 {
     assert((i < N*N) && "matrix index can not be > 15");
     return mData[i];
 }
 
-double Mat4::operator[](size_t i) const
+float Mat4::operator[](size_t i) const
 {
     assert((i < N*N) && "matrix index can not be > 15");
     return mData[i];
@@ -242,7 +242,7 @@ Vec3 Math::Mat4::operator*(const Vec3 &other) const
     vec[0] = mData[0*N+0]*other[0] + mData[0*N+1]*other[1] + mData[0*N+2]*other[2] + mData[0*N+3];
     vec[1] = mData[1*N+0]*other[0] + mData[1*N+1]*other[1] + mData[1*N+2]*other[2] + mData[1*N+3];
     vec[2] = mData[2*N+0]*other[0] + mData[2*N+1]*other[1] + mData[2*N+2]*other[2] + mData[2*N+3];
-    const double w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
+    const float w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
     vec /= w;
     return vec;
 }

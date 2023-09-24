@@ -12,7 +12,7 @@ public:
     static constexpr size_t N = 3;
 public:
     Vec3();
-    Vec3(double x, double y, double z);
+    Vec3(float x, float y, float z);
 
 public:
     friend QDebug operator<<(QDebug dbg, const Vec3 &m)
@@ -21,13 +21,15 @@ public:
     }
 
 public:
-    static double dot(const Vec3 &a, const Vec3 &b);
+    static float dot(const Vec3 &a, const Vec3 &b);
     static Vec3 cross(const Vec3 &a, const Vec3 &b);
 
 public:
-    double x() const;
-    double y() const;
-    double z() const;
+    float x() const;
+    float y() const;
+    float z() const;
+
+    float len() const;
 
 public:
     Vec3 normalized() const;
@@ -35,19 +37,19 @@ public:
 public:
     Vec3 operator+(const Vec3 &other) const;
     Vec3 operator-(const Vec3 &other) const;
-    Vec3 operator*(double value) const;
-    Vec3 operator/(double value) const;
+    Vec3 operator*(float value) const;
+    Vec3 operator/(float value) const;
 
-    Vec3 &operator*=(double value);
-    Vec3 &operator/=(double value);
+    Vec3 &operator*=(float value);
+    Vec3 &operator/=(float value);
     Vec3 &operator+=(const Vec3 &other);
 
 public:
-    double &operator[](size_t i);
-    double operator[](size_t i) const;
+    float &operator[](size_t i);
+    float operator[](size_t i) const;
 
 private:
-    std::array<double, N> mData{0};
+    std::array<float, N> mData{0};
 };
 
 } // namespace Math

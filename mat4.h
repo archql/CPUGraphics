@@ -10,10 +10,10 @@ namespace Math {
 
 #pragma pack(push, 1)
 struct MatVals4 {
-    double m00, m01, m02, m03;
-    double m10, m11, m12, m13;
-    double m20, m21, m22, m23;
-    double m30, m31, m32, m33;
+    float m00, m01, m02, m03;
+    float m10, m11, m12, m13;
+    float m20, m21, m22, m23;
+    float m30, m31, m32, m33;
 };
 #pragma pack(pop)
 
@@ -23,12 +23,12 @@ public:
     static constexpr size_t N = 4;
 public:
     Mat4();
-//    Mat4(double m00, double m01, double m02, double m03,
-//         double m10, double m11, double m12, double m13,
-//         double m20, double m21, double m22, double m23,
-//         double m30, double m31, double m32, double m33
+//    Mat4(float m00, float m01, float m02, float m03,
+//         float m10, float m11, float m12, float m13,
+//         float m20, float m21, float m22, float m23,
+//         float m30, float m31, float m32, float m33
 //        );
-    Mat4(std::array<double, N*N> data);
+    Mat4(std::array<float, N*N> data);
 
 public:
     friend QDebug operator<<(QDebug dbg, const Mat4 &m)
@@ -43,38 +43,38 @@ public:
     void loadIdentity();
     void loadZero();
 
-    void translate(double x, double y, double z);
+    void translate(float x, float y, float z);
     void translate(const Vec3 &tr);
 
-    void scale(double x, double y, double z);
+    void scale(float x, float y, float z);
     void scale(const Vec3 &sc);
 
-    void rotateX(double x);
-    void rotateY(double y);
-    void rotateZ(double z);
+    void rotateX(float x);
+    void rotateY(float y);
+    void rotateZ(float z);
 
-    void orto(double w, double h, double zNear, double zFar);
-    void perspective(double aspect, double fov, double zNear, double zFar);
-    void viewport(double x, double y, double w, double h);
+    void orto(float w, float h, float zNear, float zFar);
+    void perspective(float aspect, float fov, float zNear, float zFar);
+    void viewport(float x, float y, float w, float h);
     void view(const Vec3 &eye, const Vec3 &target, const Vec3 &up);
 public:
     Mat4 &operator+=(const Mat4 &other);
-    Mat4 &operator+=(double value);
-    Mat4 &operator*=(double value);
+    Mat4 &operator+=(float value);
+    Mat4 &operator*=(float value);
 
     Mat4 operator+(const Mat4 &other) const;
-    Mat4 operator+(double value) const;
+    Mat4 operator+(float value) const;
     Mat4 operator*(const Mat4 &other) const;
-    Mat4 operator*(double value) const;
+    Mat4 operator*(float value) const;
 
     Vec3 operator*(const Vec3 &other) const;
 
 public:
-    double &operator[](size_t i);
-    double operator[](size_t i) const;
+    float &operator[](size_t i);
+    float operator[](size_t i) const;
 
 private:
-    std::array<double, N*N> mData{0};
+    std::array<float, N*N> mData{0};
 };
 
 } // namespace Math

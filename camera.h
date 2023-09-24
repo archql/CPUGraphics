@@ -13,7 +13,7 @@ class Camera : public QObject
 {
     Q_OBJECT
 public:
-    Camera(double x = 0.0, double y = 0.0, double z = 0.0, double sensitivity = 0.001);
+    Camera(float x = 0.0, float y = 0.0, float z = 0.0, float sensitivity = 0.001);
 
 public:
     Math::Mat4 view() const;
@@ -21,19 +21,19 @@ public:
     const Math::Vec3 &pos() const {return eye;}; // test
 
 public:
-    void moveSide(double left);
-    void moveForward(double forward);
-    void moveUp(double top);
-    void rotate(double x, double y);
-    void reset(double x, double y);
+    void moveSide(float left);
+    void moveForward(float forward);
+    void moveUp(float top);
+    void rotate(float x, float y);
+    void reset(float x, float y);
 
 protected:
-    double lastX;
-    double lastY;
+    float lastX;
+    float lastY;
 
-    double pitch; // in rads
-    double yaw;
-    double sensitivity;
+    float pitch; // in rads
+    float yaw;
+    float sensitivity;
 
     Math::Vec3 eye;
     Math::Vec3 direction;
