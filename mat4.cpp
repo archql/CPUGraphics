@@ -143,7 +143,7 @@ void Mat4::viewport(float x, float y, float w, float h)
 void Mat4::view(const Vec3 &eye, const Vec3 &target, const Vec3 &up)
 {
     // TODO!!!!!!
-    auto zAxis = (target - eye).normalized();
+    auto zAxis = (eye - target).normalized();
     auto xAxis = (Vec3::cross(up, zAxis)).normalized();
     // initialize as identity matrix
     loadZero();

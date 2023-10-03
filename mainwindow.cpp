@@ -23,7 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
     if (loadOBJ(QFile("test.obj"), vertices, indices, normals))
     {
         qDebug() << "Data loaded";
-        plotter->setData(vertices, indices);
+        plotter->setData(vertices, indices, normals);
         verticescount = vertices.size();
     }
     else
@@ -43,21 +43,22 @@ MainWindow::MainWindow(QWidget *parent)
                           {1.0, 1.0, 1.0}, {1.0, -1.0, 1.0}, {1.0, -1.0, -1.0}, {1.0, 1.0, -1.0}},
                          {{0, 1, 2}, {2, 3, 0}, {7, 4, 0}, {3, 7, 0},
                           {7, 3, 2}, {2, 6, 7}, {4, 5, 6}, {6, 7, 4},
-                          {1, 2, 6}, {6, 5, 1}, {0, 1, 5}, {5, 4, 0}});
+                          {1, 2, 6}, {6, 5, 1}, {0, 1, 5}, {5, 4, 0}},
+                         {});
     }
 
 
-    QThread *thread = new QThread;
-    plotter->moveToThread(thread);
+    //QThread *thread = new QThread;
+    //plotter->moveToThread(thread);
 
     // do connections
-    QObject::connect(thread, &QThread::started, plotter, &Plotter::plot);
+    //QObject::connect(thread, &QThread::started, plotter, &Plotter::plot);
     QObject::connect(plotter, &Plotter::plotChanged, this, &MainWindow::plotChanged);
-    QObject::connect(plotter, &Plotter::cleanup, thread, &QThread::quit);
-    QObject::connect(thread, &QThread::finished, plotter, &Plotter::deleteLater);
-    QObject::connect(thread, &QThread::finished, thread, &Plotter::deleteLater);
+    //QObject::connect(plotter, &Plotter::cleanup, thread, &QThread::quit);
+    //QObject::connect(thread, &QThread::finished, plotter, &Plotter::deleteLater);
+    //QObject::connect(thread, &QThread::finished, thread, &Plotter::deleteLater);
 
-    thread->start();
+    //thread->start();
 }
 
 MainWindow::~MainWindow()
@@ -95,36 +96,41 @@ void MainWindow::keyPressEvent(QKeyEvent *ekey)
     //    case Qt::Key_A: plotter->move(0.0,  -0.1); break;
     //    case Qt::Key_D: plotter->move(0.0,  0.1); break;
     //}
+    // TODO they are called in another thread!!!!!!!
     switch(ekey->key()) {
-    case Qt::Key_W: camera->moveForward(-0.1); break;
-    case Qt::Key_S: camera->moveForward(0.1); break;
-    case Qt::Key_A: camera->moveSide(0.1); break;
-    case Qt::Key_D: camera->moveSide(-0.1); break;
+    case Qt::Key_W: camera->moveForward(0.1); break;
+    case Qt::Key_S: camera->moveForward(-0.1); break;
+    case Qt::Key_A: camera->moveSide(-0.1); break;
+    case Qt::Key_D: camera->moveSide(0.1); break;
     case Qt::Key_Space: camera->moveUp(0.1); break;
     case Qt::Key_Shift: camera->moveUp(-0.1); break;
     case Qt::Key_N: plotter->rotate(0.0,  0.0, -1.0); break;
     case Qt::Key_M: plotter->rotate(0.0,  0.0, 1.0); break;
+    case Qt::Key_P: plotter->togglePause(); break;
     }
 
-    plotter->plot();
+    //plotter->plot();
 }
 
 void MainWindow::wheelEvent(QWheelEvent *event)
 {
-        plotter->zoom(event->angleDelta().y() / 1200. + 1.0);
+    // TODO they are called in another thread!!!!!!!
+    plotter->zoom(event->angleDelta().y() / 1200. + 1.0);
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event)
 {
+    // TODO they are called in another thread!!!!!!!
     qInfo() << "press";
     plotter->getCamera()->reset(event->globalX(), event->globalY());
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event)
 {
+    // TODO they are called in another thread!!!!!!!
     qInfo() << "move";
     plotter->getCamera()->rotate(event->globalX(), event->globalY());
-    plotter->plot();
+    //plotter->plot();
 }
 
 void MainWindow::plotChanged(QImage p, qint64 t)

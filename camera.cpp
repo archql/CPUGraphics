@@ -39,7 +39,7 @@ void Camera::rotate(float x, float y)
     float dy = y - lastY;
     lastX = x;
     lastY = y;
-    pitch = std::clamp(pitch - dy * sensitivity, -std::numbers::pi_v<float> * 0.499f, std::numbers::pi_v<float> * 0.499f);  // -pi/2 to pi/2
+    pitch = std::clamp(pitch + dy * sensitivity, -std::numbers::pi_v<float> * 0.499f, std::numbers::pi_v<float> * 0.499f);  // -pi/2 to pi/2
     yaw -= dx * sensitivity;
     //yaw = std::clamp(yaw + dy * sensitivity, -std::numbers::pi * 0.249, std::numbers::pi * 0.249);
     const float ax = cos(yaw) * cos(pitch);

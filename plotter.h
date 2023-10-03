@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QImage>
 #include <QObject>
+#include <QTimer>
 #include <QVector>
 
 class Polygon {
@@ -69,9 +70,12 @@ public:
     explicit Plotter(QSize sz, QObject *parent = nullptr);
 
 public:
+    void togglePause();
+
+public:
     // TODO move to sep file
     bool loadFromObj(QFile objFile);
-    void setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes);
+    void setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes, QVector<Math::Vec3> normals);
     void rotate(float dx, float dy, float dz = 0.0);
     void move(float dx, float dy, float dz);
     void zoom(float factor);
@@ -84,16 +88,9 @@ protected:
     void drawTriangles(QVector<Math::Vec3> trData);
 
 protected:
-    bool clipCohenSuther(float &x1, float &y1, float &x2, float &y2,
-                         float rx1, float ry1, float rx2, float ry2);
-    bool edgeFunction(float ax, float ay, float bx, float by, float cx, float cy) const
-    {
-        return ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax) >= 0);
-    }
-
     void Plot(int x, int y, float z, QColor color) {
         //
-        if (x < 0 || x >= sz.width() || y < 0  || y >= sz.height()) return;
+        //if (x < 0 || x >= sz.width() || y < 0  || y >= sz.height()) return;
         // Draw pixel algorithm
         const int zindex = x + y * sz.width();
         // get z
@@ -104,44 +101,6 @@ protected:
     }
 
     void makeFrustrum(float znear, float zfar);
-
-    template<bool CULLING = true>
-    bool rayTriangleIntersect(
-        const Math::Vec3 &orig, const Math::Vec3 &dir,
-        const Math::Vec3 &a, const Math::Vec3 &b, const Math::Vec3 &c,
-        float &t, float &u, float &v)
-    {
-        static constexpr float kEpsilon = 0.00001f;
-        const Math::Vec3 ab = b - a;
-        const Math::Vec3 ac = c - a;
-        const Math::Vec3 pvec = Math::Vec3::cross(dir, ac);
-        const float det = Math::Vec3::dot(ab, pvec);
-
-        if constexpr (CULLING) {
-            // if the determinant is negative, the triangle is 'back facing'
-            // if the determinant is close to 0, the ray misses the triangle
-            if (det < kEpsilon) return false;
-        }
-        else
-        {
-            // ray and triangle are parallel if det is close to 0
-            if (fabs(det) < kEpsilon) return false;
-        }
-
-        const float invDet = 1 / det;
-
-        const Math::Vec3 tvec = orig - a;
-        u = Math::Vec3::dot(tvec, pvec) * invDet;
-        if (u < 0 || u > 1) return false;
-
-        const Math::Vec3 qvec = Math::Vec3::cross(tvec, ab);
-        v = Math::Vec3::dot(dir, qvec) * invDet;
-        if (v < 0 || u + v > 1) return false;
-
-        t = Math::Vec3::dot(ac, qvec) * invDet;
-
-        return true; // this ray hits the triangle
-    }
 
     using SlopeData = std::array<Slope, 2>;
     SlopeData makeSlope(const Math::Vec3 *from, const Math::Vec3 *to, int num_steps ) {
@@ -226,21 +185,10 @@ protected:
         }
     }
 
-
     void drawTrianglesNew()
     {
         for (const auto &tr : qAsConst(triangles)) {
-            const auto &a = tr.p0;
-            const auto &b = tr.p1;
-            const auto &c = tr.p2;
-            // clip
-//            if ((abs(a[2]) > 1 || (a[0] < 0) || (a[0] > sz.width() - 1) || (a[1] < 0) || (a[1] > sz.height() - 1)) &&
-//                (abs(b[2]) > 1 || (b[0] < 0) || (b[0] > sz.width() - 1) || (b[1] < 0) || (b[1] > sz.height() - 1)) &&
-//                (abs(c[2]) > 1 || (c[0] < 0) || (c[0] > sz.width() - 1) || (c[1] < 0) || (c[1] > sz.height() - 1))) {
-//                continue;
-//            }
-
-            rasterizeTriangle(&a, &b, &c, tr.color);
+            rasterizeTriangle(&tr.p0, &tr.p1, &tr.p2, tr.color);
         }
     }
 
@@ -371,7 +319,6 @@ protected:
 protected:
     QVector<Math::Vec3> data;
     QVector<Polygon> polygons;
-    QVector<Polygon> polygonsFiltered;
     QVector<Triangle> triangles;
 
     QVector<QVector<int>> indexes;
@@ -384,6 +331,9 @@ protected:
     Math::Mat4 matProjection;
 
     Math::Mat4 matUnProjection;
+
+protected:
+    QTimer *timer;
 };
 
 #endif // PLOTTER_H

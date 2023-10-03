@@ -10,10 +10,10 @@ namespace Math {
 class Vec3
 {
 public:
-    static constexpr size_t X = 0;
-    static constexpr size_t Y = 1;
-    static constexpr size_t Z = 2;
-    static constexpr size_t W = 3;
+    //static constexpr size_t X = 0;
+    //static constexpr size_t Y = 1;
+    //static constexpr size_t Z = 2;
+    //static constexpr size_t W = 3;
 public:
     static constexpr size_t N = 3;
 public:
