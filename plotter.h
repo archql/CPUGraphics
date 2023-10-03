@@ -3,6 +3,7 @@
 
 #include "camera.h"
 #include "mat4.h"
+#include "plane.h"
 
 #include <QFile>
 #include <QImage>
@@ -11,10 +12,30 @@
 
 class Polygon {
 public:
+    // defines indexes of associated vertices
     QVector<int> indexes;
+    // defines color
     QColor color;
     Math::Vec3 normal;
     Math::Vec3 origin;
+};
+
+// already transformed and ready to be drawn
+class Triangle {
+
+public:
+    // defines transformed vertices
+    Math::Vec3 p0, p1, p2;
+    // defines color
+    QColor color;
+
+public:
+    Triangle(const Math::Vec3 &p0,const Math::Vec3 &p1, const Math::Vec3 &p2, const QColor &color)
+        : p0(p0)
+        , p1(p1)
+        , p2(p2)
+        , color(color)
+    { }
 };
 
 
@@ -120,23 +141,40 @@ protected:
         return true; // this ray hits the triangle
     }
 
-    using SlopeData = Slope;// std::array<Slope, 2>;
+    using SlopeData = std::array<Slope, 2>;
     SlopeData makeSlope(const Math::Vec3 *from, const Math::Vec3 *to, int num_steps ) {
         SlopeData result;
         // X coords
-        //float beginZ = (*from)[2], endZ = (*to)[2];
+        float xbegin = (*from)[0], xend = (*to)[0];
         // num of steps = num of scanlines
-        result = Slope{ (*from)[0], (*to)[0], num_steps };
-        //result[1] = Slope{ beginZ, endZ, num_steps };
+        result[0] = Slope{ xbegin, xend, num_steps };
+
+        // For the Z coordinate, use the inverted value.
+        float zbegin = 1.f / (*from)[2], zend = 1.f / (*to)[2];
+        result[1] = Slope( zbegin, zend, num_steps );
+
         return result;
     }
     void drawScanLine(float y, SlopeData &left, SlopeData &right, const QColor &color) {
-        int x = left.get(), endx = right.get();
+        // Number of steps = number of pixels on this scanline = endx-x
+        int x = left[0].get(), endx = right[0].get();
+
+        // holds all point props (now only inverted z cord)
+        Slope props; // std::array<Slope, Size-2>
+        //for(unsigned p=0; p<Size-2; ++p)
+        //{
+            props = Slope( left[1].get(), right[1].get(), endx-x );
+        //}
+
         for (; x < endx; ++x) {
-            Plot(x, y, 0.0, color);
+            float z = 1.f / props.get(); // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
+            Plot(x, y, z, color);
+            // After each pixel, update the props by their step-sizes
+            props.advance();
         }
-        left.advance();
-        right.advance();
+        // After the scanline is drawn, update the X coordinate and props on both sides
+        for(auto& slope: left) slope.advance();
+        for(auto& slope: right) slope.advance();
         //for (auto &slope : left) slope.advance();
         //for (auto &slope : right) slope.advance();
     }
@@ -185,16 +223,69 @@ protected:
             drawScanLine(y, sides[0], sides[1], color);
         }
     }
-    void drawTrianglesNew(QVector<Math::Vec3> trData)
-    {
-        for (const auto &p : qAsConst(polygonsFiltered)) {
-            const auto &a = trData[p.indexes[0]];
-            const auto &b = trData[p.indexes[1]];
-            const auto &c = trData[p.indexes[2]];
 
-            rasterizeTriangle(&a, &b, &c, p.color);
+
+    void drawTrianglesNew()
+    {
+        for (const auto &tr : qAsConst(triangles)) {
+            const auto &a = tr.p0;
+            const auto &b = tr.p1;
+            const auto &c = tr.p2;
+            // clip
+            if ((abs(a[2]) > 1 || (a[0] < 0) || (a[0] > sz.width() - 1) || (a[1] < 0) || (a[1] > sz.height() - 1)) &&
+                (abs(b[2]) > 1 || (b[0] < 0) || (b[0] > sz.width() - 1) || (b[1] < 0) || (b[1] > sz.height() - 1)) &&
+                (abs(c[2]) > 1 || (c[0] < 0) || (c[0] > sz.width() - 1) || (c[1] < 0) || (c[1] > sz.height() - 1))) {
+                continue;
+            }
+
+            rasterizeTriangle(&a, &b, &c, tr.color);
         }
     }
+
+    void ClipPolygon(const Math::Plane& p, auto& points)
+        requires std::ranges::forward_range<decltype(points)>
+    {
+        bool keepfirst = true;
+
+        // Process each edge of the polygon (line segment between two successive points)
+        for(auto current = points.begin(); current != points.end(); )
+        {
+            auto next = std::next(current);
+            if(next == points.end()) { next = points.begin(); }
+
+            auto outside     = p.distanceTo(*current);
+            auto outsidenext = p.distanceTo(*next);
+
+            // If this corner is not inside the plane, keep it
+            bool keep = outside >= 0;
+            if(current == points.begin()) { keepfirst=keep; keep=true; }
+
+            // If this edge of the polygon _crosses_ the plane, generate an intersection point
+            if((outside < 0 && outsidenext > 0)
+                || (outside > 0 && outsidenext < 0))
+            {
+                auto factor = outside / (outside - outsidenext);
+
+                // Create a new point b between *current and *next like this: current + (next-current) * factor
+                auto b = *current + ((*next - *current) * factor);
+
+                if(keep) { current = std::next(points.insert(std::next(current), std::move(b))); }
+                else     { *current = std::move(b); ++current; }
+            }
+            else
+            {
+                // Keep or delete the original vertex
+                if(keep) ++current; else current = points.erase(current);
+            }
+        }
+        if(!keepfirst) points.erase(points.begin());
+    }
+
+protected:
+//    const QVector<Math::Plane> clippingPlanes = {
+//        Math::Plane(Math::Vec3(0, 0, znear), Math::Vec3(1, 0, znear), Math::Vec3()),
+
+//    };
 
 public Q_SLOTS:
     void plot();
@@ -217,6 +308,7 @@ protected:
     QVector<Math::Vec3> data;
     QVector<Polygon> polygons;
     QVector<Polygon> polygonsFiltered;
+    QVector<Triangle> triangles;
 
     QVector<QVector<int>> indexes;
 

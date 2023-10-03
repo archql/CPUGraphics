@@ -46,6 +46,12 @@ float Vec3::len() const
     return sqrt(mData[0]*mData[0] + mData[1]*mData[1] + mData[2]*mData[2]);
 }
 
+float Vec3::w() const
+{
+    static_assert(N >= 3 && "Vec len must be >= 3 to use w");
+    return mData[3];
+}
+
 Vec3 Vec3::normalized() const
 {
     Vec3 temp{*this};

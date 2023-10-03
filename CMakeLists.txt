@@ -43,6 +43,7 @@ else()
             vec3.h vec3.cpp
             objLoader.h
             camera.h camera.cpp
+            plane.h plane.cpp
         )
     endif()
 endif()

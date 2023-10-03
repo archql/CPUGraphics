@@ -6,8 +6,14 @@
 
 namespace Math {
 
+// it behaves like vec3 except it has w cordinate for 3d graphics
 class Vec3
 {
+public:
+    static constexpr size_t X = 0;
+    static constexpr size_t Y = 1;
+    static constexpr size_t Z = 2;
+    static constexpr size_t W = 3;
 public:
     static constexpr size_t N = 3;
 public:
@@ -30,6 +36,9 @@ public:
     float z() const;
 
     float len() const;
+
+public:
+    float w() const;
 
 public:
     Vec3 normalized() const;

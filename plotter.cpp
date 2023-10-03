@@ -223,35 +223,35 @@ void Plotter::plot()
     //qInfo() << camera->view() * matTranslate * matRotate * matScale;
     //qInfo() << matProjection;
     //qInfo() << matProjection * camera->view() * matTranslate * matRotate * matScale;
-    const Math::Mat4 wmat = matTranslate * matRotate * matScale; // to world cords
-    const Math::Mat4 mat = matViewport * matProjection * camera->view() * wmat;
+    const Math::Mat4 world_mat = matTranslate * matRotate * matScale; // to world cords
+    const Math::Mat4 proj_mat = matViewport * matProjection * camera->view() * world_mat;
     // convert points
     QVector<Math::Vec3> trData(data);
-    float minz = 100000, maxz = -100000;
+//    float minz = 100000, maxz = -100000;
     for (auto &p : trData) {
-        p = mat * p; // todo remove assignment
-        minz = std::min(p[2], minz);
-        maxz = std::max(p[2], maxz);
+        p = proj_mat * p; // todo remove assignment
+//        minz = std::min(p[2], minz);
+//        maxz = std::max(p[2], maxz);
     }
     // calculate colors and camera-dots
     const Math::Vec3 campos = camera->pos();
-    polygonsFiltered.clear();
+    triangles.clear();
     // const Math::Vec3 light {}; // TODO
     for (const auto &p : qAsConst(polygons)) {
         Math::Vec3 nrml = matRotate * p.normal; // preserve normalization
-        Math::Vec3 orgn = wmat * p.origin;
+        Math::Vec3 orgn = world_mat * p.origin;
 
         const float dot = Math::Vec3::dot(nrml, (orgn - campos).normalized());
         if (dot >= 0) {
-            Polygon copyP = p;
-            copyP.color = QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(abs(dot), 0.f, 1.f));
-            polygonsFiltered.push_back(copyP);
+            Triangle tr(trData[p.indexes[0]], trData[p.indexes[1]], trData[p.indexes[2]],
+                        QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(abs(dot), 0.f, 1.f)));
+            triangles.push_back(tr);
         }
     }
-    qInfo() << "minz" << minz << "maxz" << maxz;
+    //qInfo() << "minz" << minz << "maxz" << maxz;
     // draw wireframe
     //drawLines(std::move(trData)/*, std::move(trNormals), std::move(trNormalOrigins)*/);
-    drawTrianglesNew(std::move(trData));
+    drawTrianglesNew();
     // notify about buffer change
     emit plotChanged(backbuffer, t.elapsed());
 }
