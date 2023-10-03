@@ -142,7 +142,8 @@ void Mat4::viewport(float x, float y, float w, float h)
 
 void Mat4::view(const Vec3 &eye, const Vec3 &target, const Vec3 &up)
 {
-    auto zAxis = (eye - target).normalized();
+    // TODO!!!!!!
+    auto zAxis = (target - eye).normalized();
     auto xAxis = (Vec3::cross(up, zAxis)).normalized();
     // initialize as identity matrix
     loadZero();
@@ -199,6 +200,77 @@ Mat4 Mat4::operator*(float value) const
     return mat *= value;
 }
 
+Vec3 Mat4::mul(const Vec3 &other) const
+{
+    Vec3 vec;
+    vec[0] = mData[0*N+0]*other[0] + mData[0*N+1]*other[1] + mData[0*N+2]*other[2] + mData[0*N+3];
+    vec[1] = mData[1*N+0]*other[0] + mData[1*N+1]*other[1] + mData[1*N+2]*other[2] + mData[1*N+3];
+    vec[2] = mData[2*N+0]*other[0] + mData[2*N+1]*other[1] + mData[2*N+2]*other[2] + mData[2*N+3];
+    // ignore w
+    //const float w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
+    return vec;
+}
+
+Vec3 Mat4::mulOrthoDiv(const Vec3 &other) const
+{
+    Vec3 vec;
+    vec[0] = mData[0*N+0]*other[0] + mData[0*N+1]*other[1] + mData[0*N+2]*other[2] + mData[0*N+3];
+    vec[1] = mData[1*N+0]*other[0] + mData[1*N+1]*other[1] + mData[1*N+2]*other[2] + mData[1*N+3];
+    vec[2] = mData[2*N+0]*other[0] + mData[2*N+1]*other[1] + mData[2*N+2]*other[2] + mData[2*N+3];
+    const float w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
+    vec /= w;
+    return vec;
+}
+
+Mat4 Mat4::inversed() const
+{
+    const Mat4 &m = *this;
+    Mat4 im;
+    const float A2323 = mData[index(2, 2)] * mData[index(3, 3)] - mData[index(2, 3)] * mData[index(3, 2)];
+    const float A1323 = mData[index(2, 1)] * mData[index(3, 3)] - mData[index(2, 3)] * mData[index(3, 1)];
+    const float A1223 = mData[index(2, 1)] * mData[index(3, 2)] - mData[index(2, 2)] * mData[index(3, 1)];
+    const float A0323 = mData[index(2, 0)] * mData[index(3, 3)] - mData[index(2, 3)] * mData[index(3, 0)];
+    const float A0223 = mData[index(2, 0)] * mData[index(3, 2)] - mData[index(2, 2)] * mData[index(3, 0)];
+    const float A0123 = mData[index(2, 0)] * mData[index(3, 1)] - mData[index(2, 1)] * mData[index(3, 0)];
+    const float A2313 = mData[index(1, 2)] * mData[index(3, 3)] - mData[index(1, 3)] * mData[index(3, 2)];
+    const float A1313 = mData[index(1, 1)] * mData[index(3, 3)] - mData[index(1, 3)] * mData[index(3, 1)];
+    const float A1213 = mData[index(1, 1)] * mData[index(3, 2)] - mData[index(1, 2)] * mData[index(3, 1)];
+    const float A2312 = mData[index(1, 2)] * mData[index(2, 3)] - mData[index(1, 3)] * mData[index(2, 2)];
+    const float A1312 = mData[index(1, 1)] * mData[index(2, 3)] - mData[index(1, 3)] * mData[index(2, 1)];
+    const float A1212 = mData[index(1, 1)] * mData[index(2, 2)] - mData[index(1, 2)] * mData[index(2, 1)];
+    const float A0313 = mData[index(1, 0)] * mData[index(3, 3)] - mData[index(1, 3)] * mData[index(3, 0)];
+    const float A0213 = mData[index(1, 0)] * mData[index(3, 2)] - mData[index(1, 2)] * mData[index(3, 0)];
+    const float A0312 = mData[index(1, 0)] * mData[index(2, 3)] - mData[index(1, 3)] * mData[index(2, 0)];
+    const float A0212 = mData[index(1, 0)] * mData[index(2, 2)] - mData[index(1, 2)] * mData[index(2, 0)];
+    const float A0113 = mData[index(1, 0)] * mData[index(3, 1)] - mData[index(1, 1)] * mData[index(3, 0)];
+    const float A0112 = mData[index(1, 0)] * mData[index(2, 1)] - mData[index(1, 1)] * mData[index(2, 0)];
+
+    float det =   m[index(0, 0)] * ( m[index(1, 1)] * A2323 - m[index(1, 2)] * A1323 + m[index(1, 3)] * A1223 )
+                - m[index(0, 1)] * ( m[index(1, 0)] * A2323 - m[index(1, 2)] * A0323 + m[index(1, 3)] * A0223 )
+                + m[index(0, 2)] * ( m[index(1, 0)] * A1323 - m[index(1, 1)] * A0323 + m[index(1, 3)] * A0123 )
+                - m[index(0, 3)] * ( m[index(1, 0)] * A1223 - m[index(1, 1)] * A0223 + m[index(1, 2)] * A0123 );
+    det = 1.f / det;
+
+    im[index(0, 0)] = det *   ( m[index(1, 1)] * A2323 - m[index(1, 2)] * A1323 + m[index(1, 3)] * A1223 );
+    im[index(0, 1)] = det * - ( m[index(0, 1)] * A2323 - m[index(0, 2)] * A1323 + m[index(0, 3)] * A1223 );
+    im[index(0, 2)] = det *   ( m[index(0, 1)] * A2313 - m[index(0, 2)] * A1313 + m[index(0, 3)] * A1213 );
+    im[index(0, 3)] = det * - ( m[index(0, 1)] * A2312 - m[index(0, 2)] * A1312 + m[index(0, 3)] * A1212 );
+    im[index(1, 0)] = det * - ( m[index(1, 0)] * A2323 - m[index(1, 2)] * A0323 + m[index(1, 3)] * A0223 );
+    im[index(1, 1)] = det *   ( m[index(0, 0)] * A2323 - m[index(0, 2)] * A0323 + m[index(0, 3)] * A0223 );
+    im[index(1, 2)] = det * - ( m[index(0, 0)] * A2313 - m[index(0, 2)] * A0313 + m[index(0, 3)] * A0213 );
+    im[index(1, 3)] = det *   ( m[index(0, 0)] * A2312 - m[index(0, 2)] * A0312 + m[index(0, 3)] * A0212 );
+    im[index(2, 0)] = det *   ( m[index(1, 0)] * A1323 - m[index(1, 1)] * A0323 + m[index(1, 3)] * A0123 );
+    im[index(2, 1)] = det * - ( m[index(0, 0)] * A1323 - m[index(0, 1)] * A0323 + m[index(0, 3)] * A0123 );
+    im[index(2, 2)] = det *   ( m[index(0, 0)] * A1313 - m[index(0, 1)] * A0313 + m[index(0, 3)] * A0113 );
+    im[index(2, 3)] = det * - ( m[index(0, 0)] * A1312 - m[index(0, 1)] * A0312 + m[index(0, 3)] * A0112 );
+    im[index(3, 0)] = det * - ( m[index(1, 0)] * A1223 - m[index(1, 1)] * A0223 + m[index(1, 2)] * A0123 );
+    im[index(3, 1)] = det *   ( m[index(0, 0)] * A1223 - m[index(0, 1)] * A0223 + m[index(0, 2)] * A0123 );
+    im[index(3, 2)] = det * - ( m[index(0, 0)] * A1213 - m[index(0, 1)] * A0213 + m[index(0, 2)] * A0113 );
+    im[index(3, 3)] = det *   ( m[index(0, 0)] * A1212 - m[index(0, 1)] * A0212 + m[index(0, 2)] * A0112 );
+
+    return im;
+}
+
 float &Mat4::operator[](size_t i)
 {
     assert((i < N*N) && "matrix index can not be > 15");
@@ -236,15 +308,15 @@ Math::Mat4 Math::Mat4::operator*(const Mat4 &other) const
     return mat;
 }
 
-Vec3 Math::Mat4::operator*(const Vec3 &other) const
-{
-    Vec3 vec;
-    vec[0] = mData[0*N+0]*other[0] + mData[0*N+1]*other[1] + mData[0*N+2]*other[2] + mData[0*N+3];
-    vec[1] = mData[1*N+0]*other[0] + mData[1*N+1]*other[1] + mData[1*N+2]*other[2] + mData[1*N+3];
-    vec[2] = mData[2*N+0]*other[0] + mData[2*N+1]*other[1] + mData[2*N+2]*other[2] + mData[2*N+3];
-    const float w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
-    vec /= w;
-    return vec;
-}
+//Vec3 Math::Mat4::operator*(const Vec3 &other) const
+//{
+//    Vec3 vec;
+//    vec[0] = mData[0*N+0]*other[0] + mData[0*N+1]*other[1] + mData[0*N+2]*other[2] + mData[0*N+3];
+//    vec[1] = mData[1*N+0]*other[0] + mData[1*N+1]*other[1] + mData[1*N+2]*other[2] + mData[1*N+3];
+//    vec[2] = mData[2*N+0]*other[0] + mData[2*N+1]*other[1] + mData[2*N+2]*other[2] + mData[2*N+3];
+//    const float w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
+//    vec /= w;
+//    return vec;
+//}
 
 

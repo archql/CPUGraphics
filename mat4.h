@@ -67,11 +67,27 @@ public:
     Mat4 operator*(const Mat4 &other) const;
     Mat4 operator*(float value) const;
 
-    Vec3 operator*(const Vec3 &other) const;
+    // ambigious
+    //Vec3 operator*(const Vec3 &other) const;
+
+public:
+    Vec3 mul(const Vec3 &other) const;
+    Vec3 mulOrthoDiv(const Vec3 &other) const;
+
+public:
+    Mat4 inversed() const;
 
 public:
     float &operator[](size_t i);
     float operator[](size_t i) const;
+
+    //float operator[](const size_t &&i) const;
+
+public:
+    static constexpr size_t index(const size_t &&i, const size_t &&j)
+    {
+        return i * N + j;
+    }
 
 private:
     std::array<float, N*N> mData{0};

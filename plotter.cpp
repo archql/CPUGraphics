@@ -24,7 +24,17 @@ Plotter::Plotter(QSize sz, QObject *parent)
     move(-2, 0, -2);
     matViewport.viewport(0, 0, sz.width(), sz.height());
     matProjection.perspective((float)sz.width() / (float)sz.height(), 120, 0.1, 100.);
+    matUnProjection = matProjection.inversed();
     //matView.view(camera);
+    //makeFrustrum();
+    makeFrustrum(0.1, 100.); // uses matUnProjection
+    //
+    float factor = 0.999999;
+    Math::Vec3 current{0.2, 0.3, -0.7}, next{0.8, 0.3, -0.09};
+    auto b = current + ((next - current) * factor);
+    qInfo() << "???" << b;
+    qInfo() << "???" << (next - current);
+    qInfo() << "???" << (next - current) * factor;
 }
 
 void Plotter::setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes)
@@ -224,29 +234,40 @@ void Plotter::plot()
     //qInfo() << matProjection;
     //qInfo() << matProjection * camera->view() * matTranslate * matRotate * matScale;
     const Math::Mat4 world_mat = matTranslate * matRotate * matScale; // to world cords
-    const Math::Mat4 proj_mat = matViewport * matProjection * camera->view() * world_mat;
-    // convert points
+    const Math::Mat4 cam_mat = camera->view() * world_mat;
+    const Math::Mat4 proj_mat = matViewport * matProjection;
+    // convert points to cam proj
     QVector<Math::Vec3> trData(data);
-//    float minz = 100000, maxz = -100000;
     for (auto &p : trData) {
-        p = proj_mat * p; // todo remove assignment
-//        minz = std::min(p[2], minz);
-//        maxz = std::max(p[2], maxz);
+        p = cam_mat.mul(p); // todo remove assignment
     }
-    // calculate colors and camera-dots
-    const Math::Vec3 campos = camera->pos();
-    triangles.clear();
-    // const Math::Vec3 light {}; // TODO
-    for (const auto &p : qAsConst(polygons)) {
-        Math::Vec3 nrml = matRotate * p.normal; // preserve normalization
-        Math::Vec3 orgn = world_mat * p.origin;
 
-        const float dot = Math::Vec3::dot(nrml, (orgn - campos).normalized());
-        if (dot >= 0) {
-            Triangle tr(trData[p.indexes[0]], trData[p.indexes[1]], trData[p.indexes[2]],
-                        QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(abs(dot), 0.f, 1.f)));
-            triangles.push_back(tr);
+    triangles.clear();
+    for (const auto &p : qAsConst(polygons)) {
+        // get polygon points
+        QVector<Math::Vec3> points(p.indexes.size());
+        std::transform(p.indexes.cbegin(), p.indexes.cend(), points.begin(), [&](int i){return trData[i];});
+
+        // Discard polygons that are not facing the camera (back-face culling).
+        const float dot = Math::Vec3::dot(Math::Vec3::cross(points[1], points[2]).normalized(), points[0]);
+        if (dot > 1e-4f) continue;
+        // color
+        QColor color = QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(abs(dot), 0.f, 1.f));
+
+        // Clip polygon
+        for(const Math::Plane& plane : qAsConst(clippingPlanes)) clipPolygon(plane, points);
+        // If the polygon is no longer a surface, don’t try to render it.
+        if(points.size() < 3) continue;
+        // Perspective-project remaining points
+        for(auto& p: points)
+        {
+            p = proj_mat.mulOrthoDiv(p);
         }
+        // Tesselate polygon
+        tesselatePolygon(points, [&](const Math::Vec3 &a, const Math::Vec3 &b, const Math::Vec3 &c) {
+            Triangle tr(a, b, c, color);
+            triangles.push_back(tr);
+        });
     }
     //qInfo() << "minz" << minz << "maxz" << maxz;
     // draw wireframe
@@ -338,4 +359,26 @@ bool Plotter::clipCohenSuther(float &x1, float &y1, float &x2, float &y2,
         }
     }
     return result;
+}
+
+void Plotter::makeFrustrum(float znear, float zfar)
+{
+    static constexpr float zany = -0.1f; // TODO mat * vec multiplication check!!!!
+    // TODO why i div on zfar??
+    const std::vector<Math::Vec3> corners {
+        {-0.5f/znear, -0.5f/znear, zany},
+        { 0.5f/znear, -0.5f/znear, zany},
+        { 0.5f/znear,  0.5f/znear, zany},
+        {-0.5f/znear,  0.5f/znear, zany}
+    };
+    // znear = near clipping plane distance, zany = arbitrary z value
+    //clippingPlanes.clear();
+    clippingPlanes.append( {{0,0,-znear - 0.01f}, {0,1,-znear - 0.01f}, {1,0,-znear - 0.01f}} );
+    clippingPlanes.append( {{0,0,-zfar }, {1,0,-zfar }, {0,1,-zfar }} );
+    // Iterate through all successive pairs of corner points (including last->first)
+    for(auto begin = corners.begin(), end = corners.end(), current = begin; current != end; ++current)
+    {
+        auto next = std::next(current); if(next == end) next = begin;
+        clippingPlanes.append({ matUnProjection.mul(*next), matUnProjection.mul(*current), {0,0,0}} );
+    }
 }

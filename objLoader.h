@@ -48,12 +48,13 @@ bool loadOBJ(
                 int index = polydata.at(0).toInt() - 1;
                 indexes.append(index);
             }
-            if (indexes.length() > 3) {
-                out_indices.append({indexes[0], indexes[1], indexes[2]});
-                out_indices.append({indexes[2], indexes[3], indexes[0]});
-            } else {
-                out_indices.append(indexes);
-            }
+            out_indices.append(indexes);
+//            if (indexes.length() > 3) {
+//                out_indices.append({indexes[0], indexes[1], indexes[2]});
+//                out_indices.append({indexes[2], indexes[3], indexes[0]});
+//            } else {
+//                out_indices.append(indexes);
+//            }
 
 
 //            auto polydata = lineParts.at(1).split('/');

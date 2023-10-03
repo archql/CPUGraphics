@@ -65,13 +65,13 @@ Vec3 Vec3::normalized() const
 Vec3 Vec3::operator+(const Vec3 &other) const
 {
     Vec3 res;
-    std::transform(other.mData.begin(), other.mData.end(), mData.begin(), res.mData.begin(), std::plus<>{});
+    std::transform(mData.cbegin(), mData.cend(), other.mData.cbegin(), res.mData.begin(), std::plus<>{});
     return res;
 }
 Vec3 Vec3::operator-(const Vec3 &other) const
 {
     Vec3 res;
-    std::transform(other.mData.begin(), other.mData.end(), mData.begin(), res.mData.begin(), std::minus<>{});
+    std::transform(mData.cbegin(), mData.cend(), other.mData.cbegin(), res.mData.begin(), std::minus<>{});
     return res;
 }
 
@@ -101,7 +101,7 @@ Vec3 &Vec3::operator/=(float value)
 
 Vec3 &Vec3::operator+=(const Vec3 &other)
 {
-    std::transform(other.mData.begin(), other.mData.end(), mData.begin(), mData.begin(), std::plus<>{});
+    std::transform(other.mData.cbegin(), other.mData.cend(), mData.cbegin(), mData.begin(), std::plus<>{});
     return *this;
 }
 

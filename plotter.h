@@ -103,6 +103,8 @@ protected:
         }
     }
 
+    void makeFrustrum(float znear, float zfar);
+
     template<bool CULLING = true>
     bool rayTriangleIntersect(
         const Math::Vec3 &orig, const Math::Vec3 &dir,
@@ -232,18 +234,17 @@ protected:
             const auto &b = tr.p1;
             const auto &c = tr.p2;
             // clip
-            if ((abs(a[2]) > 1 || (a[0] < 0) || (a[0] > sz.width() - 1) || (a[1] < 0) || (a[1] > sz.height() - 1)) &&
-                (abs(b[2]) > 1 || (b[0] < 0) || (b[0] > sz.width() - 1) || (b[1] < 0) || (b[1] > sz.height() - 1)) &&
-                (abs(c[2]) > 1 || (c[0] < 0) || (c[0] > sz.width() - 1) || (c[1] < 0) || (c[1] > sz.height() - 1))) {
-                continue;
-            }
+//            if ((abs(a[2]) > 1 || (a[0] < 0) || (a[0] > sz.width() - 1) || (a[1] < 0) || (a[1] > sz.height() - 1)) &&
+//                (abs(b[2]) > 1 || (b[0] < 0) || (b[0] > sz.width() - 1) || (b[1] < 0) || (b[1] > sz.height() - 1)) &&
+//                (abs(c[2]) > 1 || (c[0] < 0) || (c[0] > sz.width() - 1) || (c[1] < 0) || (c[1] > sz.height() - 1))) {
+//                continue;
+//            }
 
             rasterizeTriangle(&a, &b, &c, tr.color);
         }
     }
 
-    void ClipPolygon(const Math::Plane& p, auto& points)
-        requires std::ranges::forward_range<decltype(points)>
+    void clipPolygon(const Math::Plane& p, QVector<Math::Vec3>& points)
     {
         bool keepfirst = true;
 
@@ -275,17 +276,80 @@ protected:
             else
             {
                 // Keep or delete the original vertex
-                if(keep) ++current; else current = points.erase(current);
+                if(keep)
+                    ++current;
+                else
+                    current = points.erase(current);
             }
         }
         if(!keepfirst) points.erase(points.begin());
     }
+    void tesselatePolygon(auto& points, auto && pushTriangle)
+        requires std::ranges::random_access_range<decltype(points)>
+    {
+        constexpr unsigned limit = 16;
+        bool too_many_corners = points.size() >= limit;
+
+        // prev[] and next[] form a double-directional linked list
+        unsigned char next[limit], prev[limit];
+        for(unsigned n=0; n<points.size() && n<limit; ++n)
+        {
+            next[n] = (n+1)==points.size() ? 0 : (n+1);
+            prev[n] = n==0 ? points.size()-1 : (n-1);
+        }
+        for(unsigned cur = 0, remain = points.size(); remain >= 3; --remain)
+        {
+            unsigned p1 = next[cur], p2 = next[p1];
+            unsigned a = cur, b = p1, c = p2, era = cur;
+            if(remain > 3 && !too_many_corners)
+            {
+                unsigned m1 = prev[cur], m2 = prev[m1];
+                auto curx = points[cur].x();
+                auto cury = points[cur].y();
+
+                auto p1x = points[p1].x();
+                auto p1y = points[p1].y();
+
+                auto p2x = points[p2].x();
+                auto p2y = points[p2].y();
+
+                auto m1x = points[m1].x();
+                auto m1y = points[m1].y();
+
+                auto m2x = points[m2].x();
+                auto m2y = points[m2].y();
+                // Three possible tesselations:
+                //     prev2-prev1-this (score3)
+                //     prev1-this-next1 (score1)
+                //     this-next1-next2 (score2)
+                // Score indicates how long horizontal lines there are in this triangle
+                auto score1 = (std::abs(curx-p1x) + std::abs(p1x-m1x) + std::abs(m1x-curx))
+                              - (std::abs(cury-p1y) + std::abs(p1y-m1y) + std::abs(m1y-cury));
+                auto score2 = (std::abs(curx-p1x) + std::abs(p1x-p2x) + std::abs(p2x-curx))
+                              - (std::abs(cury-p1y) + std::abs(p1y-p2y) + std::abs(p2y-cury));
+                auto score3 = (std::abs(curx-m2x) + std::abs(m2x-m1x) + std::abs(m1x-curx))
+                              - (std::abs(cury-m2y) + std::abs(m2y-m1y) + std::abs(m1y-cury));
+                if(score1 >= score2 && score1 >= score3)      { b = p1; c = m1; /* era = cur; */ }
+                else if(score2 >= score1 && score2 >= score3) { /*b = p1; c = p2;*/ era = p1; }
+                else                                          { b = m2; c = m1; era = m1; }
+            }
+        rest:
+            pushTriangle(points[a],points[b],points[c]);
+            if(too_many_corners)
+            {
+                b = c++;
+                if(c >= remain) return;
+                goto rest;
+            }
+            auto p = prev[era], n = next[era];
+            next[p] = n;
+            prev[n] = p;
+            cur = n;
+        }
+    }
 
 protected:
-//    const QVector<Math::Plane> clippingPlanes = {
-//        Math::Plane(Math::Vec3(0, 0, znear), Math::Vec3(1, 0, znear), Math::Vec3()),
-
-//    };
+    QVector<Math::Plane> clippingPlanes;
 
 public Q_SLOTS:
     void plot();
@@ -318,6 +382,8 @@ protected:
     Math::Mat4 matView;
     Math::Mat4 matViewport;
     Math::Mat4 matProjection;
+
+    Math::Mat4 matUnProjection;
 };
 
 #endif // PLOTTER_H
