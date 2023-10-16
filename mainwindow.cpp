@@ -15,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     // Setup plotter
-    plotter = new Plotter(QSize(1440, 960));
+    plotter = new Plotter(QSize(1440 , 960));
     // temp
     QVector < Math::Vec3 > vertices;
     QVector < QVector<int> > indices;
@@ -25,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
         qDebug() << "Data loaded";
         plotter->setData(vertices, indices, normals);
         verticescount = vertices.size();
+        polycount = indices.size();
     }
     else
     {
@@ -68,7 +69,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::paintEvent(QPaintEvent *event)
 {
-    qInfo() << "paint!";
+    //qInfo() << "paint!";
     auto camera = plotter->getCamera();
 
     QPainter painter(this);
@@ -77,6 +78,7 @@ void MainWindow::paintEvent(QPaintEvent *event)
     painter.drawImage(event->rect(), backbuffer); // will scale and render backbuffer
     painter.drawText(0, 0, 1000, 50, 0, QString::number(drawtime) + "ms; avg "+
                     QString::number(std::accumulate(drawtimes.begin(), drawtimes.end(), 0.0) / 100) +" ms; v " + QString::number(verticescount)
+                    + " p " + QString::number(polycount)
                     + " cam pos x " + QString::number(camera->pos().x()) + " y " + QString::number(camera->pos().y()) + " z " + QString::number(camera->pos().z()));
 }
 
@@ -121,14 +123,14 @@ void MainWindow::wheelEvent(QWheelEvent *event)
 void MainWindow::mousePressEvent(QMouseEvent *event)
 {
     // TODO they are called in another thread!!!!!!!
-    qInfo() << "press";
+    //qInfo() << "press";
     plotter->getCamera()->reset(event->globalX(), event->globalY());
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event)
 {
     // TODO they are called in another thread!!!!!!!
-    qInfo() << "move";
+    //qInfo() << "move";
     plotter->getCamera()->rotate(event->globalX(), event->globalY());
     //plotter->plot();
 }

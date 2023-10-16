@@ -33,6 +33,7 @@ protected:
 
     qint64 drawtime;
     qint64 verticescount;
+    qint64 polycount;
 
     std::array<qint64, 100> drawtimes{0};
     qint64 drawtimeTimes = 0;

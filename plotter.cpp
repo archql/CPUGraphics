@@ -9,9 +9,10 @@ Plotter::Plotter(QSize sz, QObject *parent)
     : QObject{parent}
     , backbuffer(sz, QImage::Format_RGB32)
     , zbuffer(sz.height() * sz.width())
+    , mutexes(sz.height() * sz.width())
     , clearClr{Qt::black}
     , wireframeClr{"darkorange"}
-    , camera{new Camera{0, 0, 0}}
+    , camera{new Camera{0, 0, 0}} // TEMP
 {
     // cunning optimization???? (temp)
     //backbuffer.setColor(0, clearClr.rgb());
@@ -23,11 +24,11 @@ Plotter::Plotter(QSize sz, QObject *parent)
     //matTranslate.translate(2, 0, 0);
     move(2, 0, 2);
     matViewport.viewport(0, 0, sz.width(), sz.height());
-    matProjection.perspective((float)sz.width() / (float)sz.height(), 120, 1, 100.);
+    matProjection.perspective((float)sz.width() / (float)sz.height(), 120, 0.1, 100.);
     matUnProjection = matProjection.inversed();
     //matView.view(camera);
     //makeFrustrum();
-    makeFrustrum(1, 100.); // uses matUnProjection
+    makeFrustrum(0.1, 100.); // uses matUnProjection
 
     timer = new QTimer(this);
     QObject::connect(timer, &QTimer::timeout, this, &Plotter::plot);
@@ -159,7 +160,7 @@ void Plotter::drawLines(QVector<Math::Vec3> trData)
 void Plotter::plot()
 {
     //
-    qDebug() << "plot!";
+    //qDebug() << "plot!";
     //
     QElapsedTimer t;
     t.start();
@@ -176,47 +177,89 @@ void Plotter::plot()
     const Math::Mat4 proj_mat = matViewport * matProjection;
     // convert points to cam proj
     QVector<Math::Vec3> trData(data);
-    for (auto &p : trData) {
-        p = cam_mat.mul(p); // todo remove assignment
-    }
 
-    triangles.clear();
-    for (const auto &p : qAsConst(polygons)) {
-        // get polygon points
+    std::for_each(std::execution::par_unseq, trData.begin(), trData.end(), [cam_mat](auto &p) {
+        p = cam_mat.mul(p);
+    });
+//    for (auto &p : trData) {
+//        p = cam_mat.mul(p); // todo remove assignment
+//    }
+
+    //triangles.clear();
+//    for (const auto &p : qAsConst(polygons)) {
+//        // get polygon points
+//        QVector<Math::Vec3> points(p.indexes.size());
+//        std::transform(p.indexes.cbegin(), p.indexes.cend(), points.begin(), [&](int i){return trData[i];});
+
+//        // Discard polygons that are not facing the camera (back-face culling).
+//        const float dot = Math::Vec3::dot(Math::Vec3::cross(points[1], points[2]).normalized(), points[0]);
+//        if (dot > 1e-4f) continue;
+//        // color
+//        QColor color = QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(abs(dot), 0.f, 1.f));
+
+//        // Clip polygon
+//        for(auto& p: points)
+//        {
+//            auto x = matProjection.mulOrthoDiv(p);
+//            if (abs(x.x()) > 1 || abs(x.y()) > 1)
+//                continue;
+//        }
+//        for(const Math::Plane& plane : qAsConst(clippingPlanes)) clipPolygon(plane, points);
+//        // If the polygon is no longer a surface, don’t try to render it.
+//        if(points.size() < 3) continue;
+//        // Perspective-project remaining points
+//        for(auto& p: points)
+//        {
+//            p = proj_mat.mulOrthoDiv(p);
+//        }
+//        // Tesselate polygon
+//        tesselatePolygon(points, [&](const Math::Vec3 &a, const Math::Vec3 &b, const Math::Vec3 &c) {
+//            Triangle tr(a, b, c, color);
+//            triangles.push_back(tr);
+//        });
+//    }
+    const Math::Vec3 light = Math::Vec3{1, 0, 0}.normalized();
+    std::for_each(std::execution::par_unseq, polygons.cbegin(), polygons.cend(), [&](const auto &p) {
+        //get polygon points
         QVector<Math::Vec3> points(p.indexes.size());
         std::transform(p.indexes.cbegin(), p.indexes.cend(), points.begin(), [&](int i){return trData[i];});
 
         // Discard polygons that are not facing the camera (back-face culling).
-        const float dot = Math::Vec3::dot(Math::Vec3::cross(points[1], points[2]).normalized(), points[0]);
-        if (dot > 1e-4f) continue;
+        const float dot = Math::Vec3::dot(Math::Vec3::cross(points[1], points[2]), points[0]);
+        //const float coldot = Math::Vec3::dot(Math::Vec3::cross(points[1] - points[0], points[2] - points[0]).normalized(), {0, 0, 1});
+        //const float coldot = -Math::Vec3::dot(cam_mat.mul(p.normal).normalized(), cam_mat.mul(p.origin).normalized());
+        const float coldot = -Math::Vec3::dot(Math::Vec3::cross(points[1] - points[0], points[2] - points[0]).normalized(),
+                                              ((points[1] + points[0] + points[2]) / 3).normalized());
+        //const float coldot = -Math::Vec3::dot(camera->view().mul(p.normal).normalized(),
+        //                                      camera->view().mul(light).normalized());
+        // light dir:
+        // (posLi - posPolygon)*(normal)
+        //
+        // cam cords + normals
+        if (dot > 1e-4f) return;
         // color
-        QColor color = QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(abs(dot), 0.f, 1.f));
+        QColor color = QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(coldot, .2f, 1.f));
 
         // Clip polygon
-        for(auto& p: points)
-        {
-            auto x = matProjection.mulOrthoDiv(p);
-            if (abs(x.x()) > 1 || abs(x.y()) > 1)
-                continue;
-        }
-        for(const Math::Plane& plane : qAsConst(clippingPlanes)) clipPolygon(plane, points);
+        for (const Math::Plane& plane : qAsConst(clippingPlanes)) clipPolygon(plane, points);
         // If the polygon is no longer a surface, don’t try to render it.
-        if(points.size() < 3) continue;
+        if (points.size() < 3) return;
         // Perspective-project remaining points
-        for(auto& p: points)
+        for (auto& p: points)
         {
             p = proj_mat.mulOrthoDiv(p);
         }
         // Tesselate polygon
         tesselatePolygon(points, [&](const Math::Vec3 &a, const Math::Vec3 &b, const Math::Vec3 &c) {
-            Triangle tr(a, b, c, color);
-            triangles.push_back(tr);
+            //Triangle tr(a, b, c, color);
+            //triangles.push_back(tr);
+            rasterizeTriangle(&a, &b, &c, color);
         });
-    }
+    });
     //qInfo() << "minz" << minz << "maxz" << maxz;
     // draw wireframe
     //drawLines(std::move(trData)/*, std::move(trNormals), std::move(trNormalOrigins)*/);
-    drawTrianglesNew();
+    //drawTrianglesNew();
     // notify about buffer change
     emit plotChanged(backbuffer, t.elapsed());
 }
@@ -227,10 +270,10 @@ void Plotter::makeFrustrum(float znear, float zfar)
     // TODO why i div on zfar??
     znear *= 1.0001f;
     const std::vector<Math::Vec3> corners {
-        {-0.5f/0.5001f, -0.5f/0.5001f, zany}, // WHY 0.50001???
-        { 0.5f/0.5001f, -0.5f/0.5001f, zany},
-        { 0.5f/0.5001f,  0.5f/0.5001f, zany},
-        {-0.5f/0.5001f,  0.5f/0.5001f, zany}
+        {-0.5f/0.51f, -0.5f/0.51f, zany}, // WHY 0.50001???
+        { 0.5f/0.51f, -0.5f/0.51f, zany},
+        { 0.5f/0.51f,  0.5f/0.51f, zany},
+        {-0.5f/0.51f,  0.5f/0.51f, zany}
     };
     // znear = near clipping plane distance, zany = arbitrary z value
     //clippingPlanes.clear();

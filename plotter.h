@@ -8,8 +8,11 @@
 #include <QFile>
 #include <QImage>
 #include <QObject>
+#include <QThread>
 #include <QTimer>
 #include <QVector>
+
+#include <execution>
 
 class Polygon {
 public:
@@ -88,22 +91,25 @@ protected:
     void drawTriangles(QVector<Math::Vec3> trData);
 
 protected:
-    void Plot(int x, int y, float z, QColor color) {
+    void plotPixel(int x, int y, float z, QColor color) {
         //
-        //if (x < 0 || x >= sz.width() || y < 0  || y >= sz.height()) return;
+        // if (x < 0 || x >= sz.width() || y < 0  || y >= sz.height()) return;
         // Draw pixel algorithm
         const int zindex = x + y * sz.width();
+
+        std::unique_lock l(mutexes.at(zindex));
         // get z
-        if (z < zbuffer.at(zindex) && abs(z) < 1) {
+        if (z < zbuffer.at(zindex)) {
             zbuffer[zindex] = z;
             backbuffer.setPixelColor(x, y, color);
         }
+
     }
 
     void makeFrustrum(float znear, float zfar);
 
     using SlopeData = std::array<Slope, 2>;
-    SlopeData makeSlope(const Math::Vec3 *from, const Math::Vec3 *to, int num_steps ) {
+    SlopeData makeSlope(const Math::Vec3 *from, const Math::Vec3 *to, int num_steps ) const {
         SlopeData result;
         // X coords
         float xbegin = (*from)[0], xend = (*to)[0];
@@ -112,13 +118,14 @@ protected:
 
         // For the Z coordinate, use the inverted value.
         float zbegin = 1.f / (*from)[2], zend = 1.f / (*to)[2];
+        //float zbegin = (*from)[2], zend = (*to)[2];
         result[1] = Slope( zbegin, zend, num_steps );
 
         return result;
     }
     void drawScanLine(float y, SlopeData &left, SlopeData &right, const QColor &color) {
         // Number of steps = number of pixels on this scanline = endx-x
-        int x = left[0].get(), endx = right[0].get();
+        int x = left[0].get(), endx = right[0].get(); // TODO
 
         // holds all point props (now only inverted z cord)
         Slope props; // std::array<Slope, Size-2>
@@ -129,7 +136,7 @@ protected:
 
         for (; x < endx; ++x) {
             float z = 1.f / props.get(); // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
-            Plot(x, y, z, color);
+            plotPixel(x, y, z, color);
             // After each pixel, update the props by their step-sizes
             props.advance();
         }
@@ -158,7 +165,8 @@ protected:
             std::swap(p1, p2); //
         }
         // Return if it is nothing to draw (no area)
-        if (int(y0) == int(y2)) return;
+        if (y0 == y2) return;
+        //y2++;
 
         // determine whether the short side ison the left or on the right
         bool shortside = (y1 - y0) * (x2 - x0) < (x1 - x0) * (y2 - y0);
@@ -187,12 +195,15 @@ protected:
 
     void drawTrianglesNew()
     {
-        for (const auto &tr : qAsConst(triangles)) {
+        //for (const auto &tr : qAsConst(triangles)) {
+        //    rasterizeTriangle(&tr.p0, &tr.p1, &tr.p2, tr.color);
+        //}
+        std::for_each(std::execution::unseq, triangles.cbegin(), triangles.cend(), [this](const auto &tr){
             rasterizeTriangle(&tr.p0, &tr.p1, &tr.p2, tr.color);
-        }
+        });
     }
 
-    void clipPolygon(const Math::Plane& p, QVector<Math::Vec3>& points)
+    void clipPolygon(const Math::Plane& p, QVector<Math::Vec3>& points) const
     {
         bool keepfirst = true;
 
@@ -232,7 +243,7 @@ protected:
         }
         if(!keepfirst) points.erase(points.begin());
     }
-    void tesselatePolygon(auto& points, auto && pushTriangle)
+    void tesselatePolygon(auto& points, auto && pushTriangle) const
         requires std::ranges::random_access_range<decltype(points)>
     {
         constexpr unsigned limit = 16;
@@ -310,6 +321,7 @@ protected:
     QSize sz;
     QImage backbuffer;
     QVector<float> zbuffer;
+    std::vector<std::mutex> mutexes;
     QColor clearClr;
     QColor wireframeClr;
 
