@@ -105,6 +105,12 @@ Vec3 &Vec3::operator+=(const Vec3 &other)
     return *this;
 }
 
+Vec3 &Vec3::operator-=(const Vec3 &other)
+{
+    std::transform(mData.cbegin(), mData.cend(), other.mData.cbegin(), mData.begin(), std::minus<>{});
+    return *this;
+}
+
 float &Vec3::operator[](size_t i)
 {
     assert((i < N) && "vector index can not be > 3");

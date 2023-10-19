@@ -24,6 +24,45 @@ public:
     Math::Vec3 origin;
 };
 
+struct Point {
+    Math::Vec3 vertex;
+    Math::Vec3 normal;
+    Math::Vec3 color;
+    Math::Vec3 pos;
+    Math::Vec3 tex;
+
+    Point operator+(const Point &other) const
+    {
+        Point n = *this;
+        n.vertex += other.vertex;
+        n.normal += other.normal;
+        n.color += other.color;
+        n.pos += other.pos;
+        n.tex += other.tex;
+        return n;
+    }
+    Point operator-(const Point &other) const
+    {
+        Point n = *this;
+        n.vertex -= other.vertex;
+        n.normal -= other.normal;
+        n.color -= other.color;
+        n.pos -= other.pos;
+        n.tex -= other.tex;
+        return n;
+    }
+    Point operator*(float value) const
+    {
+        Point n = *this;
+        n.vertex *= value;
+        n.normal *= value;
+        n.color *= value;
+        n.pos *= value;
+        n.tex *= value;
+        return n;
+    }
+};
+
 // already transformed and ready to be drawn
 class Triangle {
 
@@ -63,12 +102,6 @@ class Plotter : public QObject
 {
     Q_OBJECT
 
-protected:
-    static constexpr unsigned int INSIDE = 0;
-    static constexpr unsigned int LEFT =   0b0001;
-    static constexpr unsigned int RIGHT =  0b0010;
-    static constexpr unsigned int BOTTOM = 0b0100;
-    static constexpr unsigned int TOP =    0b1000;
 public:
     explicit Plotter(QSize sz, QObject *parent = nullptr);
 
@@ -78,7 +111,10 @@ public:
 public:
     // TODO move to sep file
     bool loadFromObj(QFile objFile);
-    void setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes, QVector<Math::Vec3> normals);
+    void setData(QVector<Math::Vec3> data,
+                 QVector<QVector<std::tuple<int, int, int>>> indexes,
+                 QVector<Math::Vec3> normals,
+                 QVector<Math::Vec3> colors);
     void rotate(float dx, float dy, float dz = 0.0);
     void move(float dx, float dy, float dz);
     void zoom(float factor);
@@ -91,6 +127,19 @@ protected:
     void drawTriangles(QVector<Math::Vec3> trData);
 
 protected:
+    QColor calcPhongColor(Math::Vec3 color, Math::Vec3 normal, Math::Vec3 pos) {
+        //auto clr = texture.pixel();
+        normal = normal.normalized();
+        auto tmp = (camera->pos() - pos).normalized(); // lightDir
+        float diff = std::clamp(Math::Vec3::dot(tmp, normal), 0.f, 1.f); // normal
+        float spec = pow(std::clamp(Math::Vec3::dot((tmp - (normal * (2 * diff))).normalized(), (pos - camera->pos()).normalized()), 0.f, 1.f), powSpecular);
+        //float res = std::clamp(prim + diff *0.7f + spec * 0.3f, 0.f, 1.f);
+        Math::Vec3 res = lAmbient*kAmbient + lDiffuse*(kDiffuse * diff) + lSpecular*(kSpecular * spec);
+        return QColor(std::clamp(color.x() * res.x(), 0.f, 1.f) * 255,
+                      std::clamp(color.y() * res.y(), 0.f, 1.f) * 255,
+                      std::clamp(color.z() * res.z(), 0.f, 1.f) * 255
+                      );
+    }
     void plotPixel(int x, int y, float z, QColor color) {
         //
         // if (x < 0 || x >= sz.width() || y < 0  || y >= sz.height()) return;
@@ -108,37 +157,60 @@ protected:
 
     void makeFrustrum(float znear, float zfar);
 
-    using SlopeData = std::array<Slope, 2>;
-    SlopeData makeSlope(const Math::Vec3 *from, const Math::Vec3 *to, int num_steps ) const {
+    static constexpr size_t slopeDataSz = 11;
+    using SlopeData = std::array<Slope, slopeDataSz>;
+    SlopeData makeSlope(const Point *from, const Point *to, int num_steps ) const {
         SlopeData result;
         // X coords
-        float xbegin = (*from)[0], xend = (*to)[0];
+        float xbegin = from->vertex[0], xend = to->vertex[0];
         // num of steps = num of scanlines
         result[0] = Slope{ xbegin, xend, num_steps };
 
         // For the Z coordinate, use the inverted value.
-        float zbegin = 1.f / (*from)[2], zend = 1.f / (*to)[2];
+        float zbegin = 1.f / from->vertex[2], zend = 1.f / to->vertex[2];
         //float zbegin = (*from)[2], zend = (*to)[2];
         result[1] = Slope( zbegin, zend, num_steps );
-
+        // Normal
+        float b = from->normal[0], e = to->normal[0];
+        result[2] = Slope( b, e, num_steps );
+        b = from->normal[1], e = to->normal[1];
+        result[3] = Slope( b, e, num_steps );
+        b = from->normal[2], e = to->normal[2];
+        result[4] = Slope( b, e, num_steps );
+        // Color
+        b = from->color[0], e = to->color[0];
+        result[5] = Slope( b, e, num_steps );
+        b = from->color[1], e = to->color[1];
+        result[6] = Slope( b, e, num_steps );
+        b = from->color[2], e = to->color[2];
+        result[7] = Slope( b, e, num_steps );
+        // Pos
+        b = from->pos[0], e = to->pos[0];
+        result[8] = Slope( b, e, num_steps );
+        b = from->pos[1], e = to->pos[1];
+        result[9] = Slope( b, e, num_steps );
+        b = from->pos[2], e = to->pos[2];
+        result[10] = Slope( b, e, num_steps );
         return result;
     }
-    void drawScanLine(float y, SlopeData &left, SlopeData &right, const QColor &color) {
+    void drawScanLine(float y, SlopeData &left, SlopeData &right) {
         // Number of steps = number of pixels on this scanline = endx-x
-        int x = left[0].get(), endx = right[0].get(); // TODO
+        int x = ceil(left[0].get()), endx = ceil(right[0].get()); // TODO
 
         // holds all point props (now only inverted z cord)
-        Slope props; // std::array<Slope, Size-2>
-        //for(unsigned p=0; p<Size-2; ++p)
-        //{
-            props = Slope( left[1].get(), right[1].get(), endx-x );
-        //}
+        std::array<Slope, slopeDataSz - 1> props;
+        for(unsigned p=0; p<slopeDataSz - 1; ++p)
+        {
+            props[p] = Slope( left[p + 1].get(), right[p + 1].get(), endx-x );
+        }
 
         for (; x < endx; ++x) {
-            float z = 1.f / props.get(); // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
-            plotPixel(x, y, z, color);
+            float z = 1.f / props[0].get(); // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
+            plotPixel(x, y, z, calcPhongColor(Math::Vec3{props[4].get(), props[5].get(), props[6].get()},
+                                              Math::Vec3{props[1].get(), props[2].get(), props[3].get()},
+                                              Math::Vec3{props[7].get(), props[8].get(), props[9].get()}));
             // After each pixel, update the props by their step-sizes
-            props.advance();
+            for (auto &slope : props) slope.advance();
         }
         // After the scanline is drawn, update the X coordinate and props on both sides
         for(auto& slope: left) slope.advance();
@@ -147,10 +219,11 @@ protected:
         //for (auto &slope : right) slope.advance();
     }
     // + color
-    void rasterizeTriangle(const Math::Vec3 *p0, const Math::Vec3 *p1, const Math::Vec3 *p2, const QColor &color)
+    void rasterizeTriangle(const Point *p0, const Point *p1, const Point *p2)
     {
         // top-bottom rasterization
-        auto [x0, y0, x1, y1, x2, y2] = std::tuple(p0->x(), p0->y(), p1->x(), p1->y(), p2->x(), p2->y());
+        auto [x0, y0, x1, y1, x2, y2] = std::tuple(
+            p0->vertex.x(), p0->vertex.y(), p1->vertex.x(), p1->vertex.y(), p2->vertex.x(), p2->vertex.y());
         // order points by Y cordinate
         if (std::tie(y1, x1) < std::tie(y0, x0)) {
             std::swap(x0, x1); std::swap(y0, y1);
@@ -164,9 +237,12 @@ protected:
             std::swap(x1, x2); std::swap(y1, y2);
             std::swap(p1, p2); //
         }
+        //y2++;
+        y0 = ceil(y0);
+        y1 = ceil(y1);
+        y2 = ceil(y2);
         // Return if it is nothing to draw (no area)
         if (y0 == y2) return;
-        //y2++;
 
         // determine whether the short side ison the left or on the right
         bool shortside = (y1 - y0) * (x2 - x0) < (x1 - x0) * (y2 - y0);
@@ -189,21 +265,11 @@ protected:
                     endy = y2;
                 }
             }
-            drawScanLine(y, sides[0], sides[1], color);
+            drawScanLine(y, sides[0], sides[1]);
         }
     }
 
-    void drawTrianglesNew()
-    {
-        //for (const auto &tr : qAsConst(triangles)) {
-        //    rasterizeTriangle(&tr.p0, &tr.p1, &tr.p2, tr.color);
-        //}
-        std::for_each(std::execution::unseq, triangles.cbegin(), triangles.cend(), [this](const auto &tr){
-            rasterizeTriangle(&tr.p0, &tr.p1, &tr.p2, tr.color);
-        });
-    }
-
-    void clipPolygon(const Math::Plane& p, QVector<Math::Vec3>& points) const
+    void clipPolygon(const Math::Plane& p, auto &points) const
     {
         bool keepfirst = true;
 
@@ -213,8 +279,8 @@ protected:
             auto next = std::next(current);
             if(next == points.end()) { next = points.begin(); }
 
-            auto outside     = p.distanceTo(*current);
-            auto outsidenext = p.distanceTo(*next);
+            auto outside     = p.distanceTo(current->vertex);
+            auto outsidenext = p.distanceTo(next->vertex);
 
             // If this corner is not inside the plane, keep it
             bool keep = outside >= 0;
@@ -246,37 +312,37 @@ protected:
     void tesselatePolygon(auto& points, auto && pushTriangle) const
         requires std::ranges::random_access_range<decltype(points)>
     {
-        constexpr unsigned limit = 16;
+        constexpr size_t limit = 16;
         bool too_many_corners = points.size() >= limit;
 
         // prev[] and next[] form a double-directional linked list
         unsigned char next[limit], prev[limit];
-        for(unsigned n=0; n<points.size() && n<limit; ++n)
+        for(size_t n=0; n<points.size() && n<limit; ++n)
         {
             next[n] = (n+1)==points.size() ? 0 : (n+1);
             prev[n] = n==0 ? points.size()-1 : (n-1);
         }
-        for(unsigned cur = 0, remain = points.size(); remain >= 3; --remain)
+        for(size_t cur = 0, remain = points.size(); remain >= 3; --remain)
         {
             unsigned p1 = next[cur], p2 = next[p1];
             unsigned a = cur, b = p1, c = p2, era = cur;
             if(remain > 3 && !too_many_corners)
             {
                 unsigned m1 = prev[cur], m2 = prev[m1];
-                auto curx = points[cur].x();
-                auto cury = points[cur].y();
+                auto curx = points[cur].vertex.x();
+                auto cury = points[cur].vertex.y();
 
-                auto p1x = points[p1].x();
-                auto p1y = points[p1].y();
+                auto p1x = points[p1].vertex.x();
+                auto p1y = points[p1].vertex.y();
 
-                auto p2x = points[p2].x();
-                auto p2y = points[p2].y();
+                auto p2x = points[p2].vertex.x();
+                auto p2y = points[p2].vertex.y();
 
-                auto m1x = points[m1].x();
-                auto m1y = points[m1].y();
+                auto m1x = points[m1].vertex.x();
+                auto m1y = points[m1].vertex.y();
 
-                auto m2x = points[m2].x();
-                auto m2y = points[m2].y();
+                auto m2x = points[m2].vertex.x();
+                auto m2y = points[m2].vertex.y();
                 // Three possible tesselations:
                 //     prev2-prev1-this (score3)
                 //     prev1-this-next1 (score1)
@@ -318,6 +384,18 @@ Q_SIGNALS:
     void cleanup();
 
 protected:
+    Math::Vec3 lightDir{0, 0, 1};
+
+    Math::Vec3 lAmbient{0.5, 0, 1};
+    Math::Vec3 lDiffuse{1, 1, 1};
+    Math::Vec3 lSpecular{1, 1, 1};
+
+    float kAmbient = 0.4f;
+    float kDiffuse = 0.8f;
+    float kSpecular = 0.4f;
+    float powSpecular = 20.f;
+
+protected:
     QSize sz;
     QImage backbuffer;
     QVector<float> zbuffer;
@@ -330,10 +408,15 @@ protected:
 
 protected:
     QVector<Math::Vec3> data;
+    QVector<Math::Vec3> normals;
     QVector<Polygon> polygons;
     QVector<Triangle> triangles;
+    QVector<Math::Vec3> textures;
 
-    QVector<QVector<int>> indexes;
+    QVector<QVector<std::tuple<int, int, int>>> indexes;
+    QVector<Math::Vec3> colors;
+
+    QImage texture;
 
     Math::Mat4 matScale;
     Math::Mat4 matRotate;

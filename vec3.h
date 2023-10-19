@@ -52,6 +52,7 @@ public:
     Vec3 &operator*=(float value);
     Vec3 &operator/=(float value);
     Vec3 &operator+=(const Vec3 &other);
+    Vec3 &operator-=(const Vec3 &other);
 
 public:
     float &operator[](size_t i);

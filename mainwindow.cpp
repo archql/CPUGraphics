@@ -15,15 +15,20 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     // Setup plotter
-    plotter = new Plotter(QSize(1440 , 960));
+    plotter = new Plotter(QSize(1440 / 3 , 960 /3 ));
     // temp
     QVector < Math::Vec3 > vertices;
-    QVector < QVector<int> > indices;
+    QVector < QVector<std::tuple<int, int, int>> > indices;
     QVector < Math::Vec3 > normals;
-    if (loadOBJ(QFile("test.obj"), vertices, indices, normals))
+    QVector < Math::Vec3 > colors;
+    QVector < Math::Vec3 > textures;
+    if (loadOBJ(QFile("test.obj"), vertices, indices, normals, colors, textures))
     {
         qDebug() << "Data loaded";
-        plotter->setData(vertices, indices, normals);
+        if (colors.empty()) {
+            colors.fill(Math::Vec3{1, 1, 1}, vertices.size());
+        }
+        plotter->setData(vertices, indices, normals, colors);
         verticescount = vertices.size();
         polycount = indices.size();
     }
@@ -40,12 +45,12 @@ MainWindow::MainWindow(QWidget *parent)
 //                         {{0, 1}, {1, 2}, {2, 3}, {3, 0},
 //                          {4, 5}, {5, 6}, {6, 7}, {7, 4},
 //                          {0, 4}, {1, 5}, {2, 6}, {3, 7}});
-        plotter->setData({{-1.0, 1.0, 1.0}, {-1.0, -1.0, 1.0}, {-1.0, -1.0, -1.0}, {-1.0, 1.0, -1.0},
-                          {1.0, 1.0, 1.0}, {1.0, -1.0, 1.0}, {1.0, -1.0, -1.0}, {1.0, 1.0, -1.0}},
-                         {{0, 1, 2}, {2, 3, 0}, {7, 4, 0}, {3, 7, 0},
-                          {7, 3, 2}, {2, 6, 7}, {4, 5, 6}, {6, 7, 4},
-                          {1, 2, 6}, {6, 5, 1}, {0, 1, 5}, {5, 4, 0}},
-                         {});
+//        plotter->setData({{-1.0, 1.0, 1.0}, {-1.0, -1.0, 1.0}, {-1.0, -1.0, -1.0}, {-1.0, 1.0, -1.0},
+//                          {1.0, 1.0, 1.0}, {1.0, -1.0, 1.0}, {1.0, -1.0, -1.0}, {1.0, 1.0, -1.0}},
+//                         {{0, 1, 2}, {2, 3, 0}, {7, 4, 0}, {3, 7, 0},
+//                          {7, 3, 2}, {2, 6, 7}, {4, 5, 6}, {6, 7, 4},
+//                          {1, 2, 6}, {6, 5, 1}, {0, 1, 5}, {5, 4, 0}},
+//                         {}, {});
     }
 
 

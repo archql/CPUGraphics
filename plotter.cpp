@@ -24,7 +24,7 @@ Plotter::Plotter(QSize sz, QObject *parent)
     //matTranslate.translate(2, 0, 0);
     move(2, 0, 2);
     matViewport.viewport(0, 0, sz.width(), sz.height());
-    matProjection.perspective((float)sz.width() / (float)sz.height(), 120, 0.1, 100.);
+    matProjection.perspective((float)sz.width() / (float)sz.height(), 90, 0.1, 100.);
     matUnProjection = matProjection.inversed();
     //matView.view(camera);
     //makeFrustrum();
@@ -47,7 +47,10 @@ void Plotter::togglePause()
     }
 }
 
-void Plotter::setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes, QVector<Math::Vec3> normals)
+void Plotter::setData(QVector<Math::Vec3> data,
+                      QVector<QVector<std::tuple<int, int, int>>> indexes,
+                      QVector<Math::Vec3> normals,
+                      QVector<Math::Vec3> colors)
 {
     this->data.clear();
     this->data = data;
@@ -55,22 +58,29 @@ void Plotter::setData(QVector<Math::Vec3> data, QVector<QVector<int>> indexes, Q
     this->indexes.clear();
     this->indexes = indexes;
 
+    this->normals.clear();
+    this->normals = normals;
+
+    this->colors.clear();
+    this->colors = colors;
+
+    this->texture.load("test_tex.jpg");
     // precompute normals for model
-    this->polygons.clear();
-    for (const auto &ids : qAsConst(indexes)) {
-        // get plane normal
-        const auto &a = data[ids[0]];
-        const auto &b = data[ids[1]];
-        const auto &c = data[ids[2]];
-        //const auto normal = Math::Vec3::cross(a - b, a - c).normalized(); // it is normal
-        //this->normals.append(normal);
-        //this->normalOrigins.append((a + b + c) / 3.);
-        this->polygons.append({ids,
-                               wireframeClr,
-                               Math::Vec3::cross(a - b, a - c).normalized(),
-                               (a + b + c) / 3.
-        });
-    }
+//    this->polygons.clear();
+//    for (const auto &ids : qAsConst(indexes)) {
+//        // get plane normal
+//        const auto &a = data[ids[0]];
+//        const auto &b = data[ids[1]];
+//        const auto &c = data[ids[2]];
+//        //const auto normal = Math::Vec3::cross(a - b, a - c).normalized(); // it is normal
+//        //this->normals.append(normal);
+//        //this->normalOrigins.append((a + b + c) / 3.);
+//        this->polygons.append({ids,
+//                               wireframeClr,
+//                               Math::Vec3::cross(a - b, a - c).normalized(),
+//                               (a + b + c) / 3.
+//        });
+//    }
     //
 
 
@@ -116,8 +126,8 @@ void Plotter::zoom(float factor)
 void Plotter::drawLines(QVector<Math::Vec3> trData)
 {
     for (const auto &ids : qAsConst(indexes)) {
-        const auto &a = trData[ids[0]];
-        const auto &b = trData[ids[1]];
+        const auto &a = trData[std::get<0>(ids[0])];
+        const auto &b = trData[std::get<0>(ids[1])];
 
         // DDA-line
         float x = a[0];
@@ -177,7 +187,6 @@ void Plotter::plot()
     const Math::Mat4 proj_mat = matViewport * matProjection;
     // convert points to cam proj
     QVector<Math::Vec3> trData(data);
-
     std::for_each(std::execution::par_unseq, trData.begin(), trData.end(), [cam_mat](auto &p) {
         p = cam_mat.mul(p);
     });
@@ -218,42 +227,45 @@ void Plotter::plot()
 //            triangles.push_back(tr);
 //        });
 //    }
-    const Math::Vec3 light = Math::Vec3{1, 0, 0}.normalized();
-    std::for_each(std::execution::par_unseq, polygons.cbegin(), polygons.cend(), [&](const auto &p) {
+
+    //par_unseq
+    std::for_each(std::execution::par_unseq, indexes.cbegin(), indexes.cend(), [&](const auto &ids) {
         //get polygon points
-        QVector<Math::Vec3> points(p.indexes.size());
-        std::transform(p.indexes.cbegin(), p.indexes.cend(), points.begin(), [&](int i){return trData[i];});
+        QVector<Point> points(ids.size());
+        // TODO tuple logics
+        std::transform(ids.cbegin(), ids.cend(), points.begin(), [&](std::tuple<int, int, int> i){
+            //if (std::get<0>(i) > 33000)
+            //qInfo() << std::get<0>(i) << std::get<1>(i) << trData.length() << colors.length() << normals.length();
+            return Point(trData[std::get<0>(i)],
+                         normals[std::get<1>(i)],
+                         colors[std::get<0>(i)],
+                         world_mat.mul(data[std::get<0>(i)]),
+                         textures[std::get<2>(i)]);
+        });
 
         // Discard polygons that are not facing the camera (back-face culling).
-        const float dot = Math::Vec3::dot(Math::Vec3::cross(points[1], points[2]), points[0]);
-        //const float coldot = Math::Vec3::dot(Math::Vec3::cross(points[1] - points[0], points[2] - points[0]).normalized(), {0, 0, 1});
-        //const float coldot = -Math::Vec3::dot(cam_mat.mul(p.normal).normalized(), cam_mat.mul(p.origin).normalized());
-        const float coldot = -Math::Vec3::dot(Math::Vec3::cross(points[1] - points[0], points[2] - points[0]).normalized(),
-                                              ((points[1] + points[0] + points[2]) / 3).normalized());
-        //const float coldot = -Math::Vec3::dot(camera->view().mul(p.normal).normalized(),
-        //                                      camera->view().mul(light).normalized());
-        // light dir:
-        // (posLi - posPolygon)*(normal)
-        //
-        // cam cords + normals
+        const float dot = Math::Vec3::dot(
+            Math::Vec3::cross(points[1].vertex, points[2].vertex),
+            points[0].vertex
+        );
         if (dot > 1e-4f) return;
-        // color
-        QColor color = QColor::fromHsvF(wireframeClr.hsvHueF(), 1, std::clamp(coldot, .2f, 1.f));
 
         // Clip polygon
-        for (const Math::Plane& plane : qAsConst(clippingPlanes)) clipPolygon(plane, points);
+        for (const Math::Plane& plane : qAsConst(clippingPlanes))
+            clipPolygon(plane, points);
         // If the polygon is no longer a surface, don’t try to render it.
         if (points.size() < 3) return;
         // Perspective-project remaining points
-        for (auto& p: points)
+        for (auto& p : points)
         {
-            p = proj_mat.mulOrthoDiv(p);
+            auto &x = p.vertex;
+            x = proj_mat.mulOrthoDiv(x);
         }
         // Tesselate polygon
-        tesselatePolygon(points, [&](const Math::Vec3 &a, const Math::Vec3 &b, const Math::Vec3 &c) {
+        tesselatePolygon(points, [&](const Point &a, const Point &b, const Point &c) {
             //Triangle tr(a, b, c, color);
             //triangles.push_back(tr);
-            rasterizeTriangle(&a, &b, &c, color);
+            rasterizeTriangle(&a, &b, &c);
         });
     });
     //qInfo() << "minz" << minz << "maxz" << maxz;
