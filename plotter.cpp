@@ -244,8 +244,8 @@ void Plotter::plot()
             return Point(trData[std::get<0>(i)],
                          normals[std::get<1>(i)],
                          colors[std::get<0>(i)],
-                         world_mat.mul(data[std::get<0>(i)])/*,
-                         textures[std::get<2>(i)]*/);
+                         world_mat.mul(data[std::get<0>(i)]),
+                         textures[std::get<2>(i)]);
         });
 
         // Discard polygons that are not facing the camera (back-face culling).

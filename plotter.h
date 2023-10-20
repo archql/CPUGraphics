@@ -29,7 +29,7 @@ struct Point {
     Math::Vec3 normal;
     Math::Vec3 color;
     Math::Vec3 pos;
-    //Math::Vec3 tex;
+    Math::Vec3 tex;
 
     Point operator+(const Point &other) const
     {
@@ -48,7 +48,7 @@ struct Point {
         n.normal -= other.normal;
         n.color -= other.color;
         n.pos -= other.pos;
-        //n.tex -= other.tex;
+        n.tex -= other.tex;
         return n;
     }
     Point operator*(float value) const
@@ -58,7 +58,7 @@ struct Point {
         n.normal *= value;
         n.color *= value;
         n.pos *= value;
-        //n.tex *= value;
+        n.tex *= value;
         return n;
     }
 };
@@ -134,7 +134,8 @@ protected:
                           Math::Vec3 pos,
                           Math::Vec3 tex) {
         //qInfo() << "tex " << tex.x()* texture.width() << " " << tex.y()*texture.height();
-        //auto clr = texture.pixelColor(tex.x() * texture.width(), tex.y() * texture.height());
+        auto clr = texture.pixelColor((int)((tex.x()) * texture.width()) % texture.width(),
+                                      texture.height() + (int)((-tex.y()) * texture.height()) % texture.height());
         //color[0] = clr.redF();
         //color[1] = clr.greenF();
         //color[2] = clr.blueF();
@@ -148,9 +149,9 @@ protected:
         Math::Vec3 res = lAmbient*kAmbient +
                          lDiffuse*(kDiffuse * diff / dst) +
                          lSpecular*(kSpecular * spec / dst);
-        auto x = color.x() * res.x();
-        auto y = color.y() * res.y();
-        auto z = color.z() * res.z();
+        auto x = (float)clr.redF() * color.x() * res.x();
+        auto y = (float)clr.greenF() * color.y() * res.y();
+        auto z = (float)clr.blueF() * color.z() * res.z();
         // tone mapping
 //        x = x / (1+x);
 //        y = y / (1+y); // формула Рейнхарда
@@ -193,7 +194,7 @@ protected:
 
     void makeFrustrum(float znear, float zfar);
 
-    static constexpr size_t slopeDataSz = 11;
+    static constexpr size_t slopeDataSz = 13;
     using SlopeData = std::array<Slope, slopeDataSz>;
     SlopeData makeSlope(const Point *from, const Point *to, int num_steps ) const {
         SlopeData result;
@@ -228,10 +229,10 @@ protected:
         b = from->pos[2], e = to->pos[2];
         result[10] = Slope( b, e, num_steps );
         // Tex
-//        b = from->tex[0], e = to->tex[0];
-//        result[11] = Slope( b, e, num_steps );
-//        b = from->tex[1], e = to->tex[1];
-//        result[12] = Slope( b, e, num_steps );
+        b = from->tex[0], e = to->tex[0];
+        result[11] = Slope( b, e, num_steps );
+        b = from->tex[1], e = to->tex[1];
+        result[12] = Slope( b, e, num_steps );
         return result;
     }
     void drawScanLine(float y, SlopeData &left, SlopeData &right) {
@@ -246,7 +247,8 @@ protected:
         }
 
         for (; x < endx; ++x) {
-            float z = 1.f / props[0].get(); // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
+            float invz = props[0].get();
+            float z = 1.f / invz; // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
             plotPixel(x, y, z, calcPhongColor(Math::Vec3{props[4].get(), props[5].get(), props[6].get()},
                                               Math::Vec3{props[1].get(), props[2].get(), props[3].get()},
                                               Math::Vec3{props[7].get(), props[8].get(), props[9].get()},
