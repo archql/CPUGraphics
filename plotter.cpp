@@ -24,7 +24,7 @@ Plotter::Plotter(QSize sz, QObject *parent)
     //matTranslate.translate(2, 0, 0);
     move(2, 0, 2);
     matViewport.viewport(0, 0, sz.width(), sz.height());
-    matProjection.perspective((float)sz.width() / (float)sz.height(), 90, 0.1, 100.);
+    matProjection.perspective((float)sz.width() / (float)sz.height(), 45, 0.1, 100.);
     matUnProjection = matProjection.inversed();
     //matView.view(camera);
     //makeFrustrum();
@@ -50,7 +50,8 @@ void Plotter::togglePause()
 void Plotter::setData(QVector<Math::Vec3> data,
                       QVector<QVector<std::tuple<int, int, int>>> indexes,
                       QVector<Math::Vec3> normals,
-                      QVector<Math::Vec3> colors)
+                      QVector<Math::Vec3> colors,
+                      QVector<Math::Vec3> textures)
 {
     this->data.clear();
     this->data = data;
@@ -63,6 +64,9 @@ void Plotter::setData(QVector<Math::Vec3> data,
 
     this->colors.clear();
     this->colors = colors;
+
+    this->textures.clear();
+    this->textures = textures;
 
     this->texture.load("test_tex.jpg");
     // precompute normals for model
@@ -236,11 +240,12 @@ void Plotter::plot()
         std::transform(ids.cbegin(), ids.cend(), points.begin(), [&](std::tuple<int, int, int> i){
             //if (std::get<0>(i) > 33000)
             //qInfo() << std::get<0>(i) << std::get<1>(i) << trData.length() << colors.length() << normals.length();
+            //qInfo() << "textures[std::get<2>(i)]" << textures[std::get<2>(i)].x();
             return Point(trData[std::get<0>(i)],
                          normals[std::get<1>(i)],
                          colors[std::get<0>(i)],
-                         world_mat.mul(data[std::get<0>(i)]),
-                         textures[std::get<2>(i)]);
+                         world_mat.mul(data[std::get<0>(i)])/*,
+                         textures[std::get<2>(i)]*/);
         });
 
         // Discard polygons that are not facing the camera (back-face culling).

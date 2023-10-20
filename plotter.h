@@ -29,7 +29,7 @@ struct Point {
     Math::Vec3 normal;
     Math::Vec3 color;
     Math::Vec3 pos;
-    Math::Vec3 tex;
+    //Math::Vec3 tex;
 
     Point operator+(const Point &other) const
     {
@@ -38,7 +38,7 @@ struct Point {
         n.normal += other.normal;
         n.color += other.color;
         n.pos += other.pos;
-        n.tex += other.tex;
+        //n.tex += other.tex;
         return n;
     }
     Point operator-(const Point &other) const
@@ -48,7 +48,7 @@ struct Point {
         n.normal -= other.normal;
         n.color -= other.color;
         n.pos -= other.pos;
-        n.tex -= other.tex;
+        //n.tex -= other.tex;
         return n;
     }
     Point operator*(float value) const
@@ -58,7 +58,7 @@ struct Point {
         n.normal *= value;
         n.color *= value;
         n.pos *= value;
-        n.tex *= value;
+        //n.tex *= value;
         return n;
     }
 };
@@ -114,7 +114,8 @@ public:
     void setData(QVector<Math::Vec3> data,
                  QVector<QVector<std::tuple<int, int, int>>> indexes,
                  QVector<Math::Vec3> normals,
-                 QVector<Math::Vec3> colors);
+                 QVector<Math::Vec3> colors,
+                 QVector<Math::Vec3> textures);
     void rotate(float dx, float dy, float dz = 0.0);
     void move(float dx, float dy, float dz);
     void zoom(float factor);
@@ -127,18 +128,53 @@ protected:
     void drawTriangles(QVector<Math::Vec3> trData);
 
 protected:
-    QColor calcPhongColor(Math::Vec3 color, Math::Vec3 normal, Math::Vec3 pos) {
-        //auto clr = texture.pixel();
+
+    QColor calcPhongColor(Math::Vec3 color,
+                          Math::Vec3 normal,
+                          Math::Vec3 pos,
+                          Math::Vec3 tex) {
+        //qInfo() << "tex " << tex.x()* texture.width() << " " << tex.y()*texture.height();
+        //auto clr = texture.pixelColor(tex.x() * texture.width(), tex.y() * texture.height());
+        //color[0] = clr.redF();
+        //color[1] = clr.greenF();
+        //color[2] = clr.blueF();
         normal = normal.normalized();
-        auto tmp = (camera->pos() - pos).normalized(); // lightDir
+        auto tmp2 = camera->pos() - pos;
+        auto dst = std::max(tmp2.len2(), 0.01f);
+        auto tmp = (tmp2).normalized(); // lightDir
         float diff = std::clamp(Math::Vec3::dot(tmp, normal), 0.f, 1.f); // normal
         float spec = pow(std::clamp(Math::Vec3::dot((tmp - (normal * (2 * diff))).normalized(), (pos - camera->pos()).normalized()), 0.f, 1.f), powSpecular);
         //float res = std::clamp(prim + diff *0.7f + spec * 0.3f, 0.f, 1.f);
-        Math::Vec3 res = lAmbient*kAmbient + lDiffuse*(kDiffuse * diff) + lSpecular*(kSpecular * spec);
-        return QColor(std::clamp(color.x() * res.x(), 0.f, 1.f) * 255,
-                      std::clamp(color.y() * res.y(), 0.f, 1.f) * 255,
-                      std::clamp(color.z() * res.z(), 0.f, 1.f) * 255
+        Math::Vec3 res = lAmbient*kAmbient +
+                         lDiffuse*(kDiffuse * diff / dst) +
+                         lSpecular*(kSpecular * spec / dst);
+        auto x = color.x() * res.x();
+        auto y = color.y() * res.y();
+        auto z = color.z() * res.z();
+        // tone mapping
+//        x = x / (1+x);
+//        y = y / (1+y); // формула Рейнхарда
+//        z = z / (1+z);
+        float a = 2.51f;
+        float b = 0.03f;
+        float c = 2.43f;
+        float d = 0.59f;
+        float e = 0.14f;
+        x = std::clamp((x * (a*x + b)) / (x * (c * x + d) + e), 0.f, 1.f);
+        y = std::clamp((y * (a*y + b)) / (y * (c * y + d) + e), 0.f, 1.f);
+        z = std::clamp((z * (a*z + b)) / (z * (c * z + d) + e), 0.f, 1.f);
+        // gamma correction
+        x = pow(x, 1/ 2.2);
+        y = pow(y, 1/ 2.2);
+        z = pow(z, 1/ 2.2);
+        return QColor(x * 255,
+                      y * 255,
+                      z * 255
                       );
+//        return QColor(std::clamp(color.x() * res.x(), 0.f, 1.f) * 255,
+//                      std::clamp(color.y() * res.y(), 0.f, 1.f) * 255,
+//                      std::clamp(color.z() * res.z(), 0.f, 1.f) * 255
+//                      );
     }
     void plotPixel(int x, int y, float z, QColor color) {
         //
@@ -191,6 +227,11 @@ protected:
         result[9] = Slope( b, e, num_steps );
         b = from->pos[2], e = to->pos[2];
         result[10] = Slope( b, e, num_steps );
+        // Tex
+//        b = from->tex[0], e = to->tex[0];
+//        result[11] = Slope( b, e, num_steps );
+//        b = from->tex[1], e = to->tex[1];
+//        result[12] = Slope( b, e, num_steps );
         return result;
     }
     void drawScanLine(float y, SlopeData &left, SlopeData &right) {
@@ -208,7 +249,8 @@ protected:
             float z = 1.f / props[0].get(); // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
             plotPixel(x, y, z, calcPhongColor(Math::Vec3{props[4].get(), props[5].get(), props[6].get()},
                                               Math::Vec3{props[1].get(), props[2].get(), props[3].get()},
-                                              Math::Vec3{props[7].get(), props[8].get(), props[9].get()}));
+                                              Math::Vec3{props[7].get(), props[8].get(), props[9].get()},
+                                              Math::Vec3{props[10].get(), props[11].get(), 0}));
             // After each pixel, update the props by their step-sizes
             for (auto &slope : props) slope.advance();
         }
@@ -386,14 +428,14 @@ Q_SIGNALS:
 protected:
     Math::Vec3 lightDir{0, 0, 1};
 
-    Math::Vec3 lAmbient{0.5, 0, 1};
-    Math::Vec3 lDiffuse{1, 1, 1};
-    Math::Vec3 lSpecular{1, 1, 1};
+    Math::Vec3 lAmbient{0.1, 0.1, 0.1};
+    Math::Vec3 lDiffuse{10, 10, 10};
+    Math::Vec3 lSpecular{10, 10, 10};
 
-    float kAmbient = 0.4f;
-    float kDiffuse = 0.8f;
-    float kSpecular = 0.4f;
-    float powSpecular = 20.f;
+    float kAmbient = 1.f;
+    float kDiffuse = 1.f;
+    float kSpecular = 1.f;
+    float powSpecular = 64.f;
 
 protected:
     QSize sz;

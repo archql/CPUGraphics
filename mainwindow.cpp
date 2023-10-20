@@ -15,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     // Setup plotter
-    plotter = new Plotter(QSize(1440 / 3 , 960 /3 ));
+    plotter = new Plotter(QSize(1440 , 960 ));
     // temp
     QVector < Math::Vec3 > vertices;
     QVector < QVector<std::tuple<int, int, int>> > indices;
@@ -26,9 +26,9 @@ MainWindow::MainWindow(QWidget *parent)
     {
         qDebug() << "Data loaded";
         if (colors.empty()) {
-            colors.fill(Math::Vec3{1, 1, 1}, vertices.size());
+            colors.fill(Math::Vec3{0.8, 0.2, 0.8}, vertices.size());
         }
-        plotter->setData(vertices, indices, normals, colors);
+        plotter->setData(vertices, indices, normals, colors, textures);
         verticescount = vertices.size();
         polycount = indices.size();
     }

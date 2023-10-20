@@ -43,7 +43,12 @@ float Vec3::z() const
 
 float Vec3::len() const
 {
-    return sqrt(mData[0]*mData[0] + mData[1]*mData[1] + mData[2]*mData[2]);
+    return sqrt(len2());
+}
+
+float Vec3::len2() const
+{
+    return (mData[0]*mData[0] + mData[1]*mData[1] + mData[2]*mData[2]);
 }
 
 float Vec3::w() const

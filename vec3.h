@@ -37,6 +37,8 @@ public:
 
     float len() const;
 
+    float len2() const;
+
 public:
     float w() const;
 
