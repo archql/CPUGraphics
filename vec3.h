@@ -19,6 +19,7 @@ public:
 public:
     Vec3();
     Vec3(float x, float y, float z);
+    Vec3(const QColor &clr);
 
 public:
     friend QDebug operator<<(QDebug dbg, const Vec3 &m)

@@ -15,20 +15,32 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     // Setup plotter
-    plotter = new Plotter(QSize(1440 , 960 ));
+    plotter = new Plotter(QSize(2880 / 6, 1920 / 6 ));
     // temp
     QVector < Math::Vec3 > vertices;
     QVector < QVector<std::tuple<int, int, int>> > indices;
     QVector < Math::Vec3 > normals;
     QVector < Math::Vec3 > colors;
     QVector < Math::Vec3 > textures;
-    if (loadOBJ(QFile("test.obj"), vertices, indices, normals, colors, textures))
+    QVector < int > texIDs;
+    QVector < TexInfo > texture;
+    // Material Ball/export3dcoat.obj
+    // Cyber Mancubus/mancubus.obj
+    // Cube/cube.obj
+    // Intergalactic Spaceship/Intergalactic_Spaceship-(Wavefront).obj
+    // Shovel Knight/shovel_low.obj
+    // Robot Steampunk/robot_steampunk.obj
+    // Tree man/model.obj
+    // Doom Slayer/doomslayer.obj
+    // Cat/test.obj
+    //
+    if (loadOBJ(QFile("./Models/Cube/cube.obj"), vertices, indices, normals, colors, textures, texIDs, texture))
     {
         qDebug() << "Data loaded";
         if (colors.empty()) {
             colors.fill(Math::Vec3{1, 1, 1}, vertices.size());
         }
-        plotter->setData(vertices, indices, normals, colors, textures);
+        plotter->setData(vertices, indices, normals, colors, textures, texIDs, texture);
         verticescount = vertices.size();
         polycount = indices.size();
     }

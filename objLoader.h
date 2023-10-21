@@ -2,8 +2,12 @@
 #define OBJLOADER_H
 
 #include "vec3.h"
+#include "texinfo.h"
 
 #include <QFile>
+#include <QDir>
+#include <QFileInfo>
+#include <QImage>
 
 
 bool loadOBJ(
@@ -12,9 +16,14 @@ bool loadOBJ(
     QVector < QVector<std::tuple<int, int, int>> > &out_indices, // TODO test
     QVector < Math::Vec3 > &out_normals,
     QVector < Math::Vec3 > &out_colors,
-    QVector < Math::Vec3 > &out_textures
+    QVector < Math::Vec3 > &out_textures,
+    QVector < int > &out_texIDs,
+    QVector < TexInfo > &out_texture
     )
 {
+    QMap<QString, TexInfo> textures;
+    QFile mtlFile;
+    int texId = 0;
     if (!objFile.open(QFile::ReadOnly | QFile::Text))
     {
         return false;
@@ -63,6 +72,69 @@ bool loadOBJ(
                     0
                 }); break;
             }
+            out_texIDs.append(texId);
+        }
+        else if (!first.compare("mtllib", Qt::CaseInsensitive))
+        {
+            // open file named lineParts.at(1)
+            QDir path = QFileInfo(objFile).absoluteDir();
+            QFile mtlFile(path.filePath(lineParts.at(1)));
+            //
+            if (!mtlFile.open(QFile::ReadOnly | QFile::Text))
+            {
+                qWarning() << "mtl file specified is not found!";
+                return false;
+            }
+            QString name;
+            QString texDiffusePath, texNormalPath, texBumpPath;
+            //
+            while (!mtlFile.atEnd()) {
+                QString line = mtlFile.readLine().trimmed();
+                auto lineParts = line.split(' ');
+                auto first = lineParts.at(0);
+                if (!first.compare("newmtl", Qt::CaseInsensitive)) {
+                    // dump all received files
+                    if (name.length() > 0) {
+                        textures[name] = {QImage(texDiffusePath),
+                                          QImage(texNormalPath),
+                                          QImage(texBumpPath)};
+                        //
+                        texDiffusePath.clear();
+                    }
+                    // new file decl
+                    name = lineParts.at(1);
+                    qInfo() << "name " << name;
+                } else if (!first.compare("map_Kd")) {
+                    // diffuse color
+                    texDiffusePath = path.filePath(lineParts.at(1));
+                    qInfo() << "texDiffusePath " << texDiffusePath;
+                } else if (!first.compare("map_Ke") || !first.compare("map_bump")) {
+                    // diffuse color
+                    texBumpPath = path.filePath(lineParts.at(1));
+                    qInfo() << "texBumpPath " << texBumpPath;
+                } else if (!first.compare("norm")) {
+                    // diffuse color
+                    texNormalPath = path.filePath(lineParts.at(1));
+                    qInfo() << "texNormalPath " << texNormalPath;
+                }
+            }
+            // dump all received files (DUPLICATE)
+            if (name.length() > 0) {
+                textures[name] = {QImage(texDiffusePath),
+                                  QImage(texNormalPath),
+                                  QImage(texBumpPath)};
+            } else {
+                qWarning() << "Empty mtl!";
+            }
+        }
+        else if (!first.compare("usemtl", Qt::CaseInsensitive))
+        {
+            if (textures.value(lineParts.at(1)).tDiffuse.isNull()) {
+                qWarning() << "mtl texture specified is not found in mtl file!";
+                //return false;
+            }
+            texId++;
+            out_texture.append(textures.value(lineParts.at(1)));
         }
         else if (!first.compare("f", Qt::CaseInsensitive))
         {

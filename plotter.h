@@ -3,6 +3,7 @@
 
 #include "camera.h"
 #include "mat4.h"
+#include "texinfo.h"
 #include "plane.h"
 
 #include <QFile>
@@ -29,7 +30,9 @@ struct Point {
     Math::Vec3 normal;
     Math::Vec3 color;
     Math::Vec3 pos;
+    // cordinates
     Math::Vec3 tex;
+    int texId;
 
     Point operator+(const Point &other) const
     {
@@ -38,7 +41,7 @@ struct Point {
         n.normal += other.normal;
         n.color += other.color;
         n.pos += other.pos;
-        //n.tex += other.tex;
+        n.tex += other.tex;
         return n;
     }
     Point operator-(const Point &other) const
@@ -115,7 +118,9 @@ public:
                  QVector<QVector<std::tuple<int, int, int>>> indexes,
                  QVector<Math::Vec3> normals,
                  QVector<Math::Vec3> colors,
-                 QVector<Math::Vec3> textures);
+                 QVector<Math::Vec3> textures,
+                 QVector < int > texIDs,
+                 QVector<TexInfo> texture);
     void rotate(float dx, float dy, float dz = 0.0);
     void move(float dx, float dy, float dz);
     void zoom(float factor);
@@ -132,26 +137,49 @@ protected:
     QColor calcPhongColor(Math::Vec3 color,
                           Math::Vec3 normal,
                           Math::Vec3 pos,
-                          Math::Vec3 tex) {
-        //qInfo() << "tex " << tex.x()* texture.width() << " " << tex.y()*texture.height();
-        auto clr = texture.pixelColor((int)((tex.x()) * texture.width()) % texture.width(),
-                                      texture.height() + (int)((-tex.y()) * texture.height()) % texture.height());
-        //color[0] = clr.redF();
-        //color[1] = clr.greenF();
-        //color[2] = clr.blueF();
+                          Math::Vec3 tex,
+                          int texId) {
+        //qInfo() << "tex " << tex.z() << pos.z();
+        auto &curTexBump = texture[texId].tBump;
+        auto &curTexDiffuse = texture[texId].tDiffuse;
+        auto &curTexNormal = texture[texId].tNormal;
+
+        Math::Vec3 texClr = Math::Vec3(1, 1, 1);
+        if (!curTexDiffuse.isNull()) {
+            auto w = curTexDiffuse.width(), h = curTexDiffuse.height();
+            auto tx = (int)((tex.x()) * (w)) % w;
+            auto ty = ((8*h-1) + (int)((-tex.y()) * (h))) % h;
+            texClr = curTexDiffuse.pixelColor(tx, ty);
+        }
+        float kSpecularT = kSpecular;
+        if (!curTexBump.isNull()) {
+            auto w = curTexBump.width(), h = curTexBump.height();
+            auto tx = (int)((tex.x()) * (w)) % w;
+            auto ty = ((8*h-1) + (int)((-tex.y()) * (h))) % h;
+            kSpecularT = curTexBump.pixelColor(tx, ty).redF();
+        }
+        normal = normal.normalized();
+        if (!curTexNormal.isNull()) {
+            auto w = curTexNormal.width(), h = curTexNormal.height();
+            auto tx = (int)((tex.x()) * (w)) % w;
+            auto ty = ((8*h-1) + (int)((-tex.y()) * (h))) % h;
+            auto n = Math::Vec3(curTexNormal.pixelColor(tx, ty));
+            normal[0] += n.x() * 2 - 1.0f;
+            normal[1] += n.y() * 2 - 1.0f;
+            normal[2] += n.z() * 2 - 1.0f;
+        }
         normal = normal.normalized();
         auto tmp2 = camera->pos() - pos;
         auto dst = std::max(tmp2.len2(), 0.01f);
         auto tmp = (tmp2).normalized(); // lightDir
         float diff = std::clamp(Math::Vec3::dot(tmp, normal), 0.f, 1.f); // normal
         float spec = pow(std::clamp(Math::Vec3::dot((tmp - (normal * (2 * diff))).normalized(), (pos - camera->pos()).normalized()), 0.f, 1.f), powSpecular);
-        //float res = std::clamp(prim + diff *0.7f + spec * 0.3f, 0.f, 1.f);
         Math::Vec3 res = lAmbient*kAmbient +
                          lDiffuse*(kDiffuse * diff / dst) +
-                         lSpecular*(kSpecular * spec / dst);
-        auto x = (float)clr.redF() * color.x() * res.x();
-        auto y = (float)clr.greenF() * color.y() * res.y();
-        auto z = (float)clr.blueF() * color.z() * res.z();
+                         lSpecular*(kSpecularT * spec / dst);
+        auto x = texClr.x() * color.x() * res.x();
+        auto y = texClr.y() * color.y() * res.y();
+        auto z = texClr.z() * color.z() * res.z();
         // tone mapping
 //        x = x / (1+x);
 //        y = y / (1+y); // формула Рейнхарда
@@ -172,9 +200,9 @@ protected:
                       y * 255,
                       z * 255
                       );
-//        return QColor(std::clamp(color.x() * res.x(), 0.f, 1.f) * 255,
-//                      std::clamp(color.y() * res.y(), 0.f, 1.f) * 255,
-//                      std::clamp(color.z() * res.z(), 0.f, 1.f) * 255
+//        return QColor(std::clamp(color.x(), 0.f, 1.f) * 255,
+//                      std::clamp(color.y(), 0.f, 1.f) * 255,
+//                      std::clamp(color.z(), 0.f, 1.f) * 255
 //                      );
     }
     void plotPixel(int x, int y, float z, QColor color) {
@@ -205,37 +233,44 @@ protected:
 
         // For the Z coordinate, use the inverted value.
         float zbegin = 1.f / from->vertex[2], zend = 1.f / to->vertex[2];
+//        qInfo() << "zbegin " << from->vertex[2] << " zend" << to->vertex[2];
+//        qInfo() << "izbegin" << zbegin << "izend" << zend;
+//        qInfo() << "iv  x " << from->tex[0] << " y " << to->tex[0];
+//        qInfo() << "iv  x " << from->tex[1] << " y " << to->tex[1];
+//        qInfo() << "ivz x " << from->tex[0]*zbegin << " y " << to->tex[0]*zend;
+//        qInfo() << "ivz x " << from->tex[1]*zbegin << " y " << to->tex[1]*zend;
+//        qInfo() << "num_steps" << num_steps;
         //float zbegin = (*from)[2], zend = (*to)[2];
         result[1] = Slope( zbegin, zend, num_steps );
         // Normal
         float b = from->normal[0], e = to->normal[0];
-        result[2] = Slope( b, e, num_steps );
+        result[2] = Slope( b * zbegin, e * zend, num_steps );
         b = from->normal[1], e = to->normal[1];
-        result[3] = Slope( b, e, num_steps );
+        result[3] = Slope( b * zbegin, e * zend, num_steps );
         b = from->normal[2], e = to->normal[2];
-        result[4] = Slope( b, e, num_steps );
+        result[4] = Slope( b * zbegin, e * zend, num_steps );
         // Color
         b = from->color[0], e = to->color[0];
-        result[5] = Slope( b, e, num_steps );
+        result[5] = Slope( b * zbegin, e * zend, num_steps );
         b = from->color[1], e = to->color[1];
-        result[6] = Slope( b, e, num_steps );
+        result[6] = Slope( b * zbegin, e * zend, num_steps );
         b = from->color[2], e = to->color[2];
-        result[7] = Slope( b, e, num_steps );
+        result[7] = Slope( b * zbegin, e * zend, num_steps );
         // Pos
         b = from->pos[0], e = to->pos[0];
-        result[8] = Slope( b, e, num_steps );
+        result[8] = Slope( b * zbegin, e * zend, num_steps );
         b = from->pos[1], e = to->pos[1];
-        result[9] = Slope( b, e, num_steps );
+        result[9] = Slope( b * zbegin, e * zend, num_steps );
         b = from->pos[2], e = to->pos[2];
-        result[10] = Slope( b, e, num_steps );
+        result[10] = Slope( b * zbegin, e * zend, num_steps );
         // Tex
         b = from->tex[0], e = to->tex[0];
-        result[11] = Slope( b, e, num_steps );
+        result[11] = Slope( b * zbegin, e * zend, num_steps );
         b = from->tex[1], e = to->tex[1];
-        result[12] = Slope( b, e, num_steps );
+        result[12] = Slope( b * zbegin, e * zend, num_steps );
         return result;
     }
-    void drawScanLine(float y, SlopeData &left, SlopeData &right) {
+    void drawScanLine(float y, SlopeData &left, SlopeData &right, int texId = 0) {
         // Number of steps = number of pixels on this scanline = endx-x
         int x = ceil(left[0].get()), endx = ceil(right[0].get()); // TODO
 
@@ -249,10 +284,12 @@ protected:
         for (; x < endx; ++x) {
             float invz = props[0].get();
             float z = 1.f / invz; // (props[0]) Invert the inverted z-coordinate, producing real z coordinate
-            plotPixel(x, y, z, calcPhongColor(Math::Vec3{props[4].get(), props[5].get(), props[6].get()},
-                                              Math::Vec3{props[1].get(), props[2].get(), props[3].get()},
-                                              Math::Vec3{props[7].get(), props[8].get(), props[9].get()},
-                                              Math::Vec3{props[10].get(), props[11].get(), 0}));
+            //qInfo() << "a" << props[10].get() << props[11].get();
+            //qInfo() << "b" << props[10].get()*z << props[11].get()*z;
+            plotPixel(x, y, z, calcPhongColor(Math::Vec3{props[4].get()*z, props[5].get()*z, props[6].get()*z},
+                                              Math::Vec3{props[1].get()*z, props[2].get()*z, props[3].get()*z},
+                                              Math::Vec3{props[7].get()*z, props[8].get()*z, props[9].get()*z},
+                                              Math::Vec3{props[10].get()*z, props[11].get()*z, 0}, texId));
             // After each pixel, update the props by their step-sizes
             for (auto &slope : props) slope.advance();
         }
@@ -309,7 +346,7 @@ protected:
                     endy = y2;
                 }
             }
-            drawScanLine(y, sides[0], sides[1]);
+            drawScanLine(y, sides[0], sides[1], p0->texId); // TODO costil to store tex id
         }
     }
 
@@ -460,7 +497,8 @@ protected:
     QVector<QVector<std::tuple<int, int, int>>> indexes;
     QVector<Math::Vec3> colors;
 
-    QImage texture;
+    QVector<TexInfo> texture;
+    QVector < int > texIDs;
 
     Math::Mat4 matScale;
     Math::Mat4 matRotate;

@@ -12,7 +12,7 @@ Plotter::Plotter(QSize sz, QObject *parent)
     , mutexes(sz.height() * sz.width())
     , clearClr{Qt::black}
     , wireframeClr{"darkorange"}
-    , camera{new Camera{0, 0, 0}} // TEMP
+    , camera{new Camera{-2, 0, -2}} // TEMP
 {
     // cunning optimization???? (temp)
     //backbuffer.setColor(0, clearClr.rgb());
@@ -22,7 +22,7 @@ Plotter::Plotter(QSize sz, QObject *parent)
     zoom(0.3);
     matRotate.loadIdentity();
     //matTranslate.translate(2, 0, 0);
-    move(2, 0, 2);
+    move(0, 0, 0);
     matViewport.viewport(0, 0, sz.width(), sz.height());
     matProjection.perspective((float)sz.width() / (float)sz.height(), 45, 0.1, 100.);
     matUnProjection = matProjection.inversed();
@@ -51,7 +51,9 @@ void Plotter::setData(QVector<Math::Vec3> data,
                       QVector<QVector<std::tuple<int, int, int>>> indexes,
                       QVector<Math::Vec3> normals,
                       QVector<Math::Vec3> colors,
-                      QVector<Math::Vec3> textures)
+                      QVector<Math::Vec3> textures,
+                      QVector < int > texIDs,
+                      QVector<TexInfo> texture)
 {
     this->data.clear();
     this->data = data;
@@ -68,7 +70,11 @@ void Plotter::setData(QVector<Math::Vec3> data,
     this->textures.clear();
     this->textures = textures;
 
-    this->texture.load("test_tex.jpg");
+    this->texture.clear();
+    this->texture = texture;
+
+    this->texIDs.clear();
+    this->texIDs = texIDs;
     // precompute normals for model
 //    this->polygons.clear();
 //    for (const auto &ids : qAsConst(indexes)) {
@@ -240,12 +246,12 @@ void Plotter::plot()
         std::transform(ids.cbegin(), ids.cend(), points.begin(), [&](std::tuple<int, int, int> i){
             //if (std::get<0>(i) > 33000)
             //qInfo() << std::get<0>(i) << std::get<1>(i) << trData.length() << colors.length() << normals.length();
-            //qInfo() << "textures[std::get<2>(i)]" << textures[std::get<2>(i)].x();
             return Point(trData[std::get<0>(i)],
                          normals[std::get<1>(i)],
                          colors[std::get<0>(i)],
                          world_mat.mul(data[std::get<0>(i)]),
-                         textures[std::get<2>(i)]);
+                         textures[std::get<2>(i)],
+                         texIDs[std::get<2>(i)]);
         });
 
         // Discard polygons that are not facing the camera (back-face culling).
@@ -263,8 +269,10 @@ void Plotter::plot()
         // Perspective-project remaining points
         for (auto& p : points)
         {
+            //auto tmp = p.vertex.z();
             auto &x = p.vertex;
             x = proj_mat.mulOrthoDiv(x);
+            //qInfo()<< "b4" << tmp << "af" << p.vertex.z();
         }
         // Tesselate polygon
         tesselatePolygon(points, [&](const Point &a, const Point &b, const Point &c) {

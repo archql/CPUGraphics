@@ -1,5 +1,6 @@
 #include "vec3.h"
 
+#include <QColor>
 #include <algorithm>
 #include <assert.h>
 
@@ -12,6 +13,12 @@ Vec3::Vec3()
 
 Vec3::Vec3(float x, float y, float z)
     : mData{x, y, z}
+{
+
+}
+
+Vec3::Vec3(const QColor &clr)
+    : mData{(float)clr.redF(), (float)clr.greenF(), (float)clr.blueF()}
 {
 
 }

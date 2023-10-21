@@ -219,6 +219,7 @@ Vec3 Mat4::mulOrthoDiv(const Vec3 &other) const
     vec[2] = mData[2*N+0]*other[0] + mData[2*N+1]*other[1] + mData[2*N+2]*other[2] + mData[2*N+3];
     const float w = mData[3*N+0]*other[0] + mData[3*N+1]*other[1] + mData[3*N+2]*other[2] + mData[3*N+3];
     vec /= w;
+    vec[2] = w;
     return vec;
 }
 

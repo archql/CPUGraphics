@@ -44,6 +44,7 @@ else()
             objLoader.h
             camera.h camera.cpp
             plane.h plane.cpp
+            texinfo.h
         )
     endif()
 endif()
