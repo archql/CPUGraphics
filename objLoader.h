@@ -71,6 +71,11 @@ bool loadOBJ(
                     lineParts.at(2).toFloat(),
                     0
                 }); break;
+            case 4: out_textures.append({
+                    lineParts.at(1).toFloat(),
+                    lineParts.at(2).toFloat(),
+                    lineParts.at(3).toFloat()
+                }); break;
             }
             out_texIDs.append(texId);
         }
@@ -87,6 +92,7 @@ bool loadOBJ(
             }
             QString name;
             QString texDiffusePath, texNormalPath, texBumpPath;
+            Math::Vec3 defaultColor{1, 1, 1};
             //
             while (!mtlFile.atEnd()) {
                 QString line = mtlFile.readLine().trimmed();
@@ -97,7 +103,8 @@ bool loadOBJ(
                     if (name.length() > 0) {
                         textures[name] = {QImage(texDiffusePath),
                                           QImage(texNormalPath),
-                                          QImage(texBumpPath)};
+                                          QImage(texBumpPath),
+                                          defaultColor};
                         //
                         texDiffusePath.clear();
                     }
@@ -116,6 +123,13 @@ bool loadOBJ(
                     // diffuse color
                     texNormalPath = path.filePath(lineParts.at(1));
                     qInfo() << "texNormalPath " << texNormalPath;
+                }else if (!first.compare("Kd")) {
+                    // its a color
+                    defaultColor = Math::Vec3{
+                        lineParts.at(1).toFloat(),
+                        lineParts.at(2).toFloat(),
+                        lineParts.at(3).toFloat()
+                    };
                 }
             }
             // dump all received files (DUPLICATE)
