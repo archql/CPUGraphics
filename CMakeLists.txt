@@ -45,6 +45,7 @@ else()
             camera.h camera.cpp
             plane.h plane.cpp
             texinfo.h
+            fast_gaussian_blur_template.h
         )
     endif()
 endif()
