@@ -143,6 +143,7 @@ protected:
         auto &curTexBump = texture[texId].tBump;
         auto &curTexDiffuse = texture[texId].tDiffuse;
         auto &curTexNormal = texture[texId].tNormal;
+        auto &curTexBloom = texture[texId].tBloom;
 
         Math::Vec3 texClr = texture[texId].tColor;
         if (!curTexDiffuse.isNull()) {
@@ -152,12 +153,12 @@ protected:
             texClr = curTexDiffuse.pixelColor(tx, ty);
         }
         float kSpecularT = kSpecular;
-        if (!curTexBump.isNull()) {
-            auto w = curTexBump.width(), h = curTexBump.height();
-            auto tx = (int)((tex.x()) * (w)) % w;
-            auto ty = ((16*h-1) + (int)((-tex.y()) * (h))) % h;
-            kSpecularT = curTexBump.pixelColor(tx, ty).redF();
-        }
+//        if (!curTexBump.isNull()) {
+//            auto w = curTexBump.width(), h = curTexBump.height();
+//            auto tx = (int)((tex.x()) * (w)) % w;
+//            auto ty = ((16*h-1) + (int)((-tex.y()) * (h))) % h;
+//            kSpecularT = curTexBump.pixelColor(tx, ty).redF();
+//        }
         normal = normal.normalized();
         if (!curTexNormal.isNull()) {
             auto w = curTexNormal.width(), h = curTexNormal.height();

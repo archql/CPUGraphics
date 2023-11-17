@@ -91,7 +91,7 @@ bool loadOBJ(
                 return false;
             }
             QString name;
-            QString texDiffusePath, texNormalPath, texBumpPath;
+            QString texDiffusePath, texNormalPath, texBumpPath, texBloomPath;
             Math::Vec3 defaultColor{1, 1, 1};
             //
             while (!mtlFile.atEnd()) {
@@ -104,6 +104,7 @@ bool loadOBJ(
                         textures[name] = {QImage(texDiffusePath),
                                           QImage(texNormalPath),
                                           QImage(texBumpPath),
+                                          QImage(texBloomPath),
                                           defaultColor};
                         //
                         texDiffusePath.clear();
@@ -120,10 +121,13 @@ bool loadOBJ(
                     texBumpPath = path.filePath(lineParts.at(1));
                     qInfo() << "texBumpPath " << texBumpPath;
                 } else if (!first.compare("norm")) {
-                    // diffuse color
+                    // normals color
                     texNormalPath = path.filePath(lineParts.at(1));
                     qInfo() << "texNormalPath " << texNormalPath;
-                }else if (!first.compare("Kd")) {
+                } else if (!first.compare("map_MRAO")) {
+                    texBloomPath = path.filePath(lineParts.at(1));
+                    qInfo() << "texBloomPath " << texBloomPath;
+                } else if (!first.compare("Kd")) {
                     // its a color
                     defaultColor = Math::Vec3{
                         lineParts.at(1).toFloat(),

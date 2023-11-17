@@ -9,6 +9,7 @@ struct TexInfo {
     QImage tDiffuse;
     QImage tNormal;
     QImage tBump;
+    QImage tBloom;
     Math::Vec3 tColor;
 };
 

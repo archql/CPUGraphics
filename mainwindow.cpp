@@ -34,7 +34,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Doom Slayer/doomslayer.obj
     // Cat/test.obj
     //
-    if (loadOBJ(QFile("./Models/Material Ball/export3dcoat.obj"), vertices, indices, normals, colors, textures, texIDs, texture))
+    if (loadOBJ(QFile("./Models/Shovel Knight/shovel_low.obj"), vertices, indices, normals, colors, textures, texIDs, texture))
     {
         qDebug() << "Data loaded";
         if (colors.empty()) {
