@@ -18,6 +18,7 @@ public:
     static constexpr size_t N = 3;
 public:
     Vec3();
+    Vec3(const char * data);
     Vec3(float x, float y, float z);
     Vec3(const QColor &clr);
 
@@ -60,6 +61,13 @@ public:
 public:
     float &operator[](size_t i);
     float operator[](size_t i) const;
+
+public:
+    const float *data() const;
+    float *data();
+
+public:
+    void set(const char * data);
 
 private:
     std::array<float, N> mData{0};

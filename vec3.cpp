@@ -11,6 +11,11 @@ Vec3::Vec3()
 
 }
 
+Vec3::Vec3(const char *data)
+{
+    set(data);
+}
+
 Vec3::Vec3(float x, float y, float z)
     : mData{x, y, z}
 {
@@ -127,6 +132,21 @@ float &Vec3::operator[](size_t i)
 {
     assert((i < N) && "vector index can not be > 3");
     return mData[i];
+}
+
+const float *Vec3::data() const
+{
+    return mData.data();
+}
+
+float *Vec3::data()
+{
+    return mData.data();
+}
+
+void Vec3::set(const char *data)
+{
+    std::memcpy(mData.data(), data, N * 4);
 }
 
 float Vec3::operator[](size_t i) const

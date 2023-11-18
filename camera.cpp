@@ -4,10 +4,10 @@
 
 Camera::Camera(float x, float y, float z, float sensitivity)
     : pitch(0)
-    , yaw(0)
+    , yaw(-std::numbers::pi_v<float> * 0.5)
     , sensitivity{sensitivity}
     , eye{x, y, z}
-    , direction{1, 0, 0} // {1, 0, 0}
+    , direction{0, 0, -1} // {1, 0, 0}
     , up{0, 1, 0} // {0, 1, 0}
 {
 

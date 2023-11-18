@@ -134,11 +134,37 @@ protected:
 
 protected:
 
-    QColor calcPhongColor(Math::Vec3 color,
+    QColor colorCorrection(const Math::Vec3 &clr) {
+        float x = clr.x();
+        float y = clr.y();
+        float z = clr.z();
+
+        // tone mapping
+                x = x / (1+x);
+                y = y / (1+y); // формула Рейнхарда
+                z = z / (1+z);
+//        float a = 2.51f;
+//        float b = 0.03f;
+//        float c = 2.43f;
+//        float d = 0.59f;
+//        float e = 0.14f;
+//        x = std::clamp((x * (a*x + b)) / (x * (c * x + d) + e), 0.f, 1.f);
+//        y = std::clamp((y * (a*y + b)) / (y * (c * y + d) + e), 0.f, 1.f);
+//        z = std::clamp((z * (a*z + b)) / (z * (c * z + d) + e), 0.f, 1.f);
+        // gamma correction
+        //x = pow(x, 1/ 2.2);
+        //y = pow(y, 1/ 2.2);
+        //z = pow(z, 1/ 2.2);
+        return QColor (x * 255,
+                y * 255,
+                z * 255);
+    }
+
+    std::pair<Math::Vec3, Math::Vec3> calcPhongColor(Math::Vec3 color,
                           Math::Vec3 normal,
                           Math::Vec3 pos,
                           Math::Vec3 tex,
-                          int texId) {
+                          int texId, int px, int py) {
         //qInfo() << "tex " << tex.z() << pos.z();
         auto &curTexBump = texture[texId].tBump;
         auto &curTexDiffuse = texture[texId].tDiffuse;
@@ -147,10 +173,17 @@ protected:
 
         Math::Vec3 texClr = texture[texId].tColor;
         if (!curTexDiffuse.isNull()) {
-            auto w = curTexDiffuse.width(), h = curTexDiffuse.height();
+            auto w = curTexDiffuse.width()-1, h = curTexDiffuse.height()-1;
             auto tx = (int)((tex.x()) * (w)) % w;
             auto ty = ((16*h-1) + (int)((-tex.y() * h))) % h;
             texClr = curTexDiffuse.pixelColor(tx, ty);
+        }
+        Math::Vec3 texBloom(0.0, 0.0, 0.0);
+        if (!curTexBloom.isNull()) {
+            auto w = curTexBloom.width(), h = curTexBloom.height();
+            auto tx = (int)((tex.x()) * (w)) % w;
+            auto ty = ((16*h-1) + (int)((-tex.y() * h))) % h;
+            texBloom = curTexBloom.pixelColor(tx, ty);
         }
         float kSpecularT = kSpecular;
 //        if (!curTexBump.isNull()) {
@@ -181,32 +214,21 @@ protected:
         auto x = texClr.x() * color.x() * res.x();
         auto y = texClr.y() * color.y() * res.y();
         auto z = texClr.z() * color.z() * res.z();
-        // tone mapping
-//        x = x / (1+x);
-//        y = y / (1+y); // формула Рейнхарда
-//        z = z / (1+z);
-        float a = 2.51f;
-        float b = 0.03f;
-        float c = 2.43f;
-        float d = 0.59f;
-        float e = 0.14f;
-        x = std::clamp((x * (a*x + b)) / (x * (c * x + d) + e), 0.f, 1.f);
-        y = std::clamp((y * (a*y + b)) / (y * (c * y + d) + e), 0.f, 1.f);
-        z = std::clamp((z * (a*z + b)) / (z * (c * z + d) + e), 0.f, 1.f);
-        // gamma correction
-        x = pow(x, 1/ 2.2);
-        y = pow(y, 1/ 2.2);
-        z = pow(z, 1/ 2.2);
-        return QColor(x * 255,
-                      y * 255,
-                      z * 255
-                      );
+        //
+        Math::Vec3 resclr{x, y,z};
+//        auto brightness = 5.0 * (texBloom.x() + texBloom.y() + texBloom.z()); // Math::Vec3::dot(resclr, texBloom * 50000);
+//        if (brightness > 1.0) {
+//            return std::make_pair<>(texBloom * 100, true);
+//        } else {
+//            return std::make_pair<>(resclr, false);
+//        }
+        return std::make_pair<>(resclr, texBloom * 2);
 //        return QColor(std::clamp(color.x(), 0.f, 1.f) * 255,
 //                      std::clamp(color.y(), 0.f, 1.f) * 255,
 //                      std::clamp(color.z(), 0.f, 1.f) * 255
 //                      );
     }
-    void plotPixel(int x, int y, float z, QColor color) {
+    void plotPixel(int x, int y, float z, std::pair<Math::Vec3, Math::Vec3> color) {
         //
         // if (x < 0 || x >= sz.width() || y < 0  || y >= sz.height()) return;
         // Draw pixel algorithm
@@ -216,7 +238,17 @@ protected:
         // get z
         if (z < zbuffer.at(zindex)) {
             zbuffer[zindex] = z;
-            backbuffer.setPixelColor(x, y, color);
+            //backbuffer.setPixelColor(x, y, color);
+            auto posclr = (float *)(colorbuffer.data()) + zindex * 3;
+            auto posbloom = (float *)(bloombuffertmp.data()) + zindex * 3;
+            std::memcpy(posclr, color.first.data(), 4*3);
+            // Bloom
+            //if (color.second) {
+                //color.first *= 2;
+                std::memcpy(posbloom, color.second.data(), 4*3);
+            //} else {
+                //std::memset(posbloom, 0, 4*3);
+            //}
         }
 
     }
@@ -290,7 +322,7 @@ protected:
             plotPixel(x, y, z, calcPhongColor(Math::Vec3{props[4].get()*z, props[5].get()*z, props[6].get()*z},
                                               Math::Vec3{props[1].get()*z, props[2].get()*z, props[3].get()*z},
                                               Math::Vec3{props[7].get()*z, props[8].get()*z, props[9].get()*z},
-                                              Math::Vec3{props[10].get()*z, props[11].get()*z, 0}, texId));
+                                              Math::Vec3{props[10].get()*z, props[11].get()*z, 0}, texId, x, y));
             // After each pixel, update the props by their step-sizes
             for (auto &slope : props) slope.advance();
         }
@@ -480,6 +512,10 @@ protected:
 protected:
     QSize sz;
     QImage backbuffer;
+    //QImage bloombuffer;
+    QByteArray bloombuffertmp;
+    QByteArray bloombuffer;
+    QByteArray colorbuffer;
     QVector<float> zbuffer;
     std::vector<std::mutex> mutexes;
     QColor clearClr;

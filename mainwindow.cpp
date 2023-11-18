@@ -15,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     // Setup plotter
-    plotter = new Plotter(QSize(2880 / 2, 1920 / 2 ));
+    plotter = new Plotter(QSize(2880 / 2 , 1920 / 2 ));
     // temp
     QVector < Math::Vec3 > vertices;
     QVector < QVector<std::tuple<int, int, int>> > indices;
@@ -34,7 +34,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Doom Slayer/doomslayer.obj
     // Cat/test.obj
     //
-    if (loadOBJ(QFile("./Models/Shovel Knight/shovel_low.obj"), vertices, indices, normals, colors, textures, texIDs, texture))
+    if (loadOBJ(QFile("./Models/Cyber Mancubus/mancubus.obj"), vertices, indices, normals, colors, textures, texIDs, texture))
     {
         qDebug() << "Data loaded";
         if (colors.empty()) {

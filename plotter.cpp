@@ -1,4 +1,5 @@
 #include "plotter.h"
+#include "fast_gaussian_blur_template.h"
 
 #include <QElapsedTimer>
 #include <QDebug>
@@ -8,11 +9,14 @@
 Plotter::Plotter(QSize sz, QObject *parent)
     : QObject{parent}
     , backbuffer(sz, QImage::Format_RGB32)
+    , bloombuffertmp(sz.height() * sz.width() * 3 * 4, 0)
+    , bloombuffer(sz.height() * sz.width() * 3 * 4, 0)
+    , colorbuffer(sz.height() * sz.width() * 3 * 4, 0)
     , zbuffer(sz.height() * sz.width())
     , mutexes(sz.height() * sz.width())
     , clearClr{Qt::black}
     , wireframeClr{"darkorange"}
-    , camera{new Camera{-2, 0, -2}} // TEMP
+    , camera{new Camera{0, 0, 2}} // TEMP
 {
     // cunning optimization???? (temp)
     //backbuffer.setColor(0, clearClr.rgb());
@@ -186,6 +190,8 @@ void Plotter::plot()
     t.start();
     // clear backbuffer with clear color and zbuffer
     backbuffer.fill(clearClr);
+    bloombuffertmp.fill(0);
+    colorbuffer.fill(0); // black
     zbuffer.fill(std::numeric_limits<float>::max());
     // get transform matrix
     // matView = camera->view();
@@ -281,10 +287,27 @@ void Plotter::plot()
             rasterizeTriangle(&a, &b, &c);
         });
     });
-    //qInfo() << "minz" << minz << "maxz" << maxz;
-    // draw wireframe
-    //drawLines(std::move(trData)/*, std::move(trNormals), std::move(trNormalOrigins)*/);
-    //drawTrianglesNew();
+    // blur (3 channels, 20 sigma, 10 ite)
+    float * p1 = (float *)bloombuffertmp.data();
+    float * p2 = (float *)bloombuffer.data();
+    fast_gaussian_blur(p1, p2,
+        backbuffer.width(), backbuffer.height(), 3, 6, 3
+    );
+    // sum images
+    auto iteb = bloombuffertmp.begin();
+    auto itec = colorbuffer.begin();
+    for (size_t i = 0; i < backbuffer.height(); ++i) {
+        for (size_t j = 0; j < backbuffer.width(); ++j) {
+            Math::Vec3 b(iteb);
+            Math::Vec3 c(itec);
+            c += b;
+            //auto b4 = backbuffer.pixelColor(j, i);
+            backbuffer.setPixelColor(j, i, colorCorrection(c));
+            iteb += 12;
+            itec += 12;
+        }
+    }
+
     // notify about buffer change
     emit plotChanged(backbuffer, t.elapsed());
 }

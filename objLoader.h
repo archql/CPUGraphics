@@ -116,7 +116,7 @@ bool loadOBJ(
                     // diffuse color
                     texDiffusePath = path.filePath(lineParts.at(1));
                     qInfo() << "texDiffusePath " << texDiffusePath;
-                } else if (!first.compare("map_Ke") || !first.compare("map_bump")) {
+                } else if (!first.compare("map_bump")) {
                     // diffuse color
                     texBumpPath = path.filePath(lineParts.at(1));
                     qInfo() << "texBumpPath " << texBumpPath;
@@ -124,7 +124,7 @@ bool loadOBJ(
                     // normals color
                     texNormalPath = path.filePath(lineParts.at(1));
                     qInfo() << "texNormalPath " << texNormalPath;
-                } else if (!first.compare("map_MRAO")) {
+                } else if (!first.compare("map_Ke")) {
                     texBloomPath = path.filePath(lineParts.at(1));
                     qInfo() << "texBloomPath " << texBloomPath;
                 } else if (!first.compare("Kd")) {
